@@ -1,0 +1,176 @@
+.markdown-body {
+	background-color: transparent;
+	font-size: 14px;
+	padding: 6px 0;
+
+	p {
+		white-space: pre-wrap;
+	}
+
+	hr {
+		height: 1px;
+		background-color: rgba(0, 0, 0, 0.08);
+		border: 0;
+		margin: 20px 0;
+	}
+
+	ol {
+		list-style-type: decimal;
+	}
+
+	ul {
+		list-style-type: disc;
+	}
+
+	pre code,
+	pre tt {
+		line-height: 1.65;
+	}
+
+	.highlight pre,
+	pre {
+		background-color: #ffffff;
+		border-radius: 12px;
+	}
+
+	pre,
+	.code-block-wrapper {
+		max-width: 100%;
+		overflow-x: auto;
+	}
+
+	code.hljs {
+		padding: 0;
+	}
+
+	.code-block {
+		&-wrapper {
+			position: relative;
+			padding-top: 40px;
+			border-radius: 12px;
+			overflow: hidden;
+		}
+
+		&-header {
+			position: absolute;
+			top: 0;
+			right: 0;
+			width: 100%;
+			padding: 8px 14px;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+
+			&__lang {
+				font-size: 12px;
+				color: #94a3b8;
+				font-weight: 500;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+			}
+
+			&__copy {
+				cursor: pointer;
+				font-size: 12px;
+				color: #94a3b8;
+				user-select: none;
+				padding: 2px 8px;
+				border-radius: 6px;
+				transition: all 150ms ease;
+
+				&:hover {
+					color: #6366f1;
+					background: rgba(99, 102, 241, 0.08);
+				}
+			}
+		}
+	}
+
+	img {
+		max-width: 100%;
+		height: auto;
+		max-height: 300px;
+		border-radius: 10px;
+		display: inline-block;
+	}
+
+	table {
+		width: 100%;
+		max-width: 100%;
+		border-collapse: collapse;
+		border-spacing: 0;
+		display: block;
+		overflow-x: auto;
+
+		th,
+		td {
+			padding: 8px 14px;
+			border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+		}
+		
+		tr {
+			background-color: transparent;
+			border-top: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+		}
+
+		tr:nth-child(2n) {
+			background-color: var(--surface-hover, rgba(0, 0, 0, 0.04));
+		}
+	}
+}
+
+.message-bubble-ai {
+	width: 100%;
+}
+
+.message-bubble-user {
+	max-width: 80%;
+}
+
+.message-bubble-ai .markdown-body,
+.message-bubble-user .markdown-body {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.message-bubble-ai .whitespace-pre-wrap,
+.message-bubble-user .whitespace-pre-wrap {
+	max-width: 100%;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+.katexmath-block {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+html.dark {
+
+	.message-bubble-ai {
+		.whitespace-pre-wrap {
+			white-space: pre-wrap;
+			color: var(--n-text-color);
+		}
+	}
+
+	.highlight pre,
+	pre {
+		background-color: #1e1e2e;
+	}
+
+	.markdown-body table {
+		th,
+		td {
+			border-color: rgba(255, 255, 255, 0.12);
+		}
+		
+		tr {
+			border-color: rgba(255, 255, 255, 0.12);
+		}
+
+		tr:nth-child(2n) {
+			background-color: rgba(255, 255, 255, 0.04);
+		}
+	}
+}

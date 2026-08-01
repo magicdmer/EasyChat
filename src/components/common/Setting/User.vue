@@ -1,0 +1,351 @@
+<script lang="ts" setup>
+import { computed, h, onMounted, reactive, ref } from 'vue'
+import { NButton, NDataTable, NInput, NModal, NSelect, NSpace, NTag, useDialog, useMessage } from 'naive-ui'
+import { Status, UserInfo, UserRole, userRoleOptions } from './model'
+import { fetchGetUsers, fetchUpdateUser, fetchUpdateUserStatus } from '@/api'
+import { t } from '@/locales'
+import { useBasicLayout } from '@/hooks/useBasicLayout'
+
+const ms = useMessage()
+const dialog = useDialog()
+const { isMobile } = useBasicLayout()
+const loading = ref(false)
+const show = ref(false)
+const handleSaving = ref(false)
+const userRef = ref(new UserInfo([UserRole.User]))
+const buttonText = ref('')
+
+function isValidEmail(value?: string) {
+  return Boolean(value && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value.trim()))
+}
+
+const emailStatus = computed(() => {
+  if (!userRef.value.email)
+    return undefined
+  return isValidEmail(userRef.value.email) ? undefined : 'error'
+})
+
+const users = ref([])
+const columns = [
+  {
+    title: t('setting.email'),
+    key: 'email',
+    resizable: true,
+    width: 200,
+    minWidth: 100,
+    maxWidth: 200,
+  },
+  {
+    title: t('setting.registerTime'),
+    key: 'createTime',
+    width: 220,
+  },
+  {
+    title: t('setting.visitTime'),
+    key: 'visitTime',
+    width: 220,
+  },
+  {
+    title: t('setting.userRoles'),
+    key: 'status',
+    width: 200,
+    render(row: any) {
+      const roles = row.roles.map((role: UserRole) => {
+        return h(
+          NTag,
+          {
+            style: {
+              marginRight: '6px',
+            },
+            type: 'info',
+            bordered: false,
+          },
+          {
+            default: () => UserRole[role],
+          },
+        )
+      })
+      return roles
+    },
+  },
+  {
+    title: t('setting.remark'),
+    key: 'remark',
+    width: 220,
+  },
+  {
+    title: t('setting.status'),
+    key: 'status',
+    width: 150,
+    render(row: any) {
+      return Status[row.status]
+    },
+  },
+  {
+    title: t('common.action'),
+    key: 'id',
+    width: 220,
+    render(row: any) {
+      const actions: any[] = []
+      actions.push(h(
+        NButton,
+        {
+          size: 'small',
+          type: 'error',
+          style: {
+            marginRight: '6px',
+          },
+          onClick: () => handleUpdateUserStatus(row.id, Status.Deleted),
+        },
+        { default: () => t('common.delete') },
+      ))
+      if (row.status === Status.Normal) {
+        actions.push(h(
+          NButton,
+          {
+            size: 'small',
+            type: 'primary',
+            style: {
+              marginRight: '8px',
+            },
+            onClick: () => handleEditUser(row),
+          },
+          { default: () => t('common.edit') },
+        ))
+      }
+      if (row.status === Status.PreVerify || row.status === Status.AdminVerify) {
+        actions.push(h(
+          NButton,
+          {
+            size: 'small',
+            type: 'info',
+            onClick: () => handleUpdateUserStatus(row.id, Status.Normal),
+          },
+          { default: () => t('chat.verifiedUser') },
+        ))
+      }
+      else {
+        if (row.status === Status.Disabled) {
+          buttonText.value = t('common.unblock')
+          actions.push(h(
+            NButton,
+            {
+              size: 'small',
+              type: 'info',
+              onClick: () => handleUpdateUserStatus(row.id, Status.Normal),
+            },
+            { default: () => buttonText.value },
+          ))
+        }
+        else {
+          buttonText.value = t('common.block')
+          actions.push(h(
+            NButton,
+            {
+              size: 'small',
+              type: 'info',
+              onClick: () => handleUpdateUserStatus(row.id, Status.Disabled),
+            },
+            { default: () => buttonText.value },
+          ))
+        }
+      }
+      return actions
+    },
+  },
+]
+const pagination = reactive ({
+  page: 1,
+  pageSize: 25,
+  pageCount: 1,
+  itemCount: 1,
+  prefix({ itemCount }: { itemCount: number | undefined }) {
+    return `Total is ${itemCount}.`
+  },
+  showSizePicker: true,
+  pageSizes: [25, 50, 100],
+  onChange: (page: number) => {
+    pagination.page = page
+    handleGetUsers(pagination.page)
+  },
+  onUpdatePageSize: (pageSize: number) => {
+    pagination.pageSize = pageSize
+    pagination.page = 1
+    handleGetUsers(pagination.page)
+  },
+})
+
+async function handleGetUsers(page: number) {
+  if (loading.value)
+    return
+  users.value.length = 0
+  loading.value = true
+  const size = pagination.pageSize
+  const data = (await fetchGetUsers(page, size)).data
+  data.users.forEach((user: never) => {
+    users.value.push(user)
+  })
+  pagination.page = page
+  pagination.pageCount = data.total / size + (data.total % size === 0 ? 0 : 1)
+  pagination.itemCount = data.total
+  loading.value = false
+}
+
+async function handleUpdateUserStatus(userId: string, status: Status) {
+  if (status === Status.Deleted) {
+    dialog.warning({
+      title: t('chat.deleteUser'),
+      content: t('chat.deleteUserConfirm'),
+      positiveText: t('common.yes'),
+      negativeText: t('common.no'),
+      onPositiveClick: async () => {
+        await fetchUpdateUserStatus(userId, status)
+        ms.info('OK')
+        await handleGetUsers(pagination.page)
+      },
+    })
+  }
+  else if (status === Status.Disabled) {
+    dialog.warning({
+      title: t('common.block'),
+      content: t('chat.blockUserConfirm'),
+      positiveText: t('common.yes'),
+      negativeText: t('common.no'),
+      onPositiveClick: async () => {
+        await fetchUpdateUserStatus(userId, status)
+        ms.info('OK')
+        await handleGetUsers(pagination.page)
+        buttonText.value = t('common.unblock')
+      },
+    })
+  }
+  else {
+    await fetchUpdateUserStatus(userId, status)
+    ms.info('OK')
+    await handleGetUsers(pagination.page)
+    buttonText.value = t('common.block')
+  }
+}
+
+function handleNewUser() {
+  userRef.value = new UserInfo([UserRole.User])
+  show.value = true
+}
+
+function handleEditUser(user: UserInfo) {
+  userRef.value = user
+  show.value = true
+}
+
+async function handleUpdateUser() {
+  if (!userRef.value.id && !isValidEmail(userRef.value.email)) {
+    ms.error('请输入格式正确的邮箱')
+    return
+  }
+  if (!userRef.value.id && !userRef.value.password) {
+    ms.error('密码不能为空')
+    return
+  }
+
+  handleSaving.value = true
+  try {
+    await fetchUpdateUser(userRef.value)
+    await handleGetUsers(pagination.page)
+    show.value = false
+  }
+  catch (error: any) {
+    ms.error(error.message)
+  }
+  handleSaving.value = false
+}
+
+onMounted(async () => {
+  await handleGetUsers(pagination.page)
+})
+</script>
+
+<template>
+  <div class="p-4 space-y-5 min-h-[200px]">
+    <div class="space-y-6">
+      <NSpace vertical :size="12">
+        <div class="flex justify-end">
+          <NButton @click="handleNewUser()">
+            {{ $t('setting.addUser') }}
+          </NButton>
+        </div>
+        <NDataTable
+          ref="table"
+          remote
+          :loading="loading"
+          :row-key="(rowData) => rowData.id"
+          :columns="columns"
+          :data="users"
+          :pagination="pagination"
+          :max-height="444"
+          striped
+          :scroll-x="1430"
+          @update:page="handleGetUsers"
+        />
+      </NSpace>
+    </div>
+  </div>
+
+  <NModal v-model:show="show" :auto-focus="false" preset="card" :style="{ width: !isMobile ? '33%' : '100%' }">
+    <div class="p-4 space-y-5 min-h-[200px]">
+      <div class="space-y-6">
+        <div class="flex items-center space-x-4">
+          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.email') }}</span>
+          <div class="flex-1">
+            <NInput
+              v-model:value="userRef.email"
+              :disabled="userRef.id !== undefined"
+              :status="emailStatus"
+              placeholder="name@example.com"
+            />
+            <div v-if="emailStatus === 'error'" class="mt-1 text-xs text-red-500">
+              请输入格式正确的邮箱
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.password') }}</span>
+          <div class="flex-1">
+            <NInput
+              v-model:value="userRef.password"
+              type="password"
+              placeholder="password"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.userRoles') }}</span>
+          <div class="flex-1">
+            <NSelect
+              style="width: 100%"
+              multiple
+              :value="userRef.roles"
+              :options="userRoleOptions"
+              @update-value="value => userRef.roles = value"
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.remark') }}</span>
+          <div class="flex-1">
+            <NInput
+              v-model:value="userRef.remark" type="textarea"
+              :autosize="{ minRows: 1, maxRows: 2 }" placeholder=""
+            />
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="flex-shrink-0 w-[100px]" />
+          <NButton type="primary" :loading="handleSaving" @click="handleUpdateUser()">
+            {{ $t('common.save') }}
+          </NButton>
+        </div>
+      </div>
+    </div>
+  </NModal>
+</template>

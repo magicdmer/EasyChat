@@ -1,0 +1,76 @@
+import { defineStore } from 'pinia'
+import jwt_decode from 'jwt-decode'
+import type { UserInfo } from '../user/helper'
+import { getToken, removeToken, setToken } from './helper'
+import { store, useChatStore, useUserStore } from '@/store'
+import { fetchSession } from '@/api'
+import type { UserConfig, UserRole } from '@/components/common/Setting/model'
+
+interface SessionResponse {
+  auth: boolean
+  allowRegister: boolean
+  chatModels: {
+    label: string
+    key: string
+    value: string
+  }[]
+  allChatModels: {
+    label: string
+    key: string
+    value: string
+  }[]
+  defaultChatModel?: string
+  userInfo: { name: string; description: string; avatar: string; userId: string; root: boolean; roles: UserRole[]; config: UserConfig }
+}
+
+export interface AuthState {
+  token: string | undefined
+  session: SessionResponse | null
+}
+
+export const useAuthStore = defineStore('auth-store', {
+  state: (): AuthState => ({
+    token: getToken(),
+    session: null,
+  }),
+
+  actions: {
+    async getSession() {
+      try {
+        const { data } = await fetchSession<SessionResponse>()
+        this.session = { ...data }
+        return Promise.resolve(data)
+      }
+      catch (error) {
+        return Promise.reject(error)
+      }
+    },
+
+    async setToken(token: string) {
+      this.token = token
+      const decoded = jwt_decode(token) as UserInfo
+      const userStore = useUserStore()
+
+      await userStore.updateUserInfo(false, {
+        avatar: decoded.avatar,
+        name: decoded.name,
+        description: decoded.description,
+        root: decoded.root,
+      })
+      setToken(token)
+    },
+
+    async removeToken() {
+      this.token = undefined
+      const userStore = useUserStore()
+      userStore.resetUserInfo()
+      const chatStore = useChatStore()
+      await chatStore.clearLocalChat()
+      removeToken()
+    },
+  },
+})
+
+export function useAuthStoreWithout() {
+  return useAuthStore(store)
+}

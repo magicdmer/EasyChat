@@ -1,0 +1,24 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="bubble" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#EDE9FE"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="16" y="16" width="224" height="224" rx="56" fill="url(#bg)"/>
+
+  <path
+    d="M72 86c0-18.8 15.2-34 34-34h44c18.8 0 34 15.2 34 34v30c0 18.8-15.2 34-34 34h-25l-22 17c-4.9 3.8-11 .3-11-5.9V150c-11.9-4.5-20-16-20-29V86z"
+    fill="url(#bubble)"
+  />
+
+  <rect x="96" y="96" width="64" height="12" rx="6" fill="#7C3AED" fill-opacity="0.88"/>
+  <rect x="96" y="118" width="46" height="12" rx="6" fill="#7C3AED" fill-opacity="0.62"/>
+
+  <path d="M176 70l4 10 10 4-10 4-4 10-4-10-10-4 10-4 4-10z" fill="#FDE68A"/>
+</svg>
