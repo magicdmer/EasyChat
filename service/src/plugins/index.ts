@@ -41,13 +41,17 @@ function isRecord(value: unknown): value is Record<string, any> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-function getPluginDirectory(): string {
-  if (process.env.PLUGIN_DIR)
-    return path.resolve(process.env.PLUGIN_DIR)
+function getPluginDirectories(): string[] {
+  const configuredDirectories = [process.env.BUILTIN_PLUGIN_DIR, process.env.PLUGIN_DIR]
+    .filter((directory): directory is string => Boolean(directory))
+    .map(directory => path.resolve(directory))
+  if (configuredDirectories.length > 0)
+    return [...new Set(configuredDirectories)]
+
   const cwdDirectory = path.resolve(process.cwd(), 'plugins')
   if (fs.existsSync(cwdDirectory))
-    return cwdDirectory
-  return path.resolve(process.cwd(), '../plugins')
+    return [cwdDirectory]
+  return [path.resolve(process.cwd(), '../plugins')]
 }
 
 function validateSettingValue(key: string, definition: PluginSettingDefinition, value: unknown): void {
@@ -221,47 +225,64 @@ async function loadPlugins(): Promise<void> {
   const nextLoadErrors: PluginLoadError[] = []
   const generation = ++loadGeneration
 
-  const pluginDirectory = getPluginDirectory()
-  if (!fs.existsSync(pluginDirectory)) {
+  const pluginDirectories = getPluginDirectories()
+  const existingDirectories = pluginDirectories.filter((pluginDirectory) => {
+    if (fs.existsSync(pluginDirectory))
+      return true
     globalThis.console.warn(`Plugin directory does not exist: ${pluginDirectory}`)
+    return false
+  })
+  if (existingDirectories.length === 0) {
     loadedPlugins.clear()
     loadErrors.length = 0
     return
   }
 
-  const candidates: Array<{ directory: string; manifest: PluginManifest }> = []
-  const directories = fs.readdirSync(pluginDirectory, { withFileTypes: true })
-    .filter(entry => entry.isDirectory())
-    .map(entry => path.join(pluginDirectory, entry.name))
-    .sort()
+  const candidates: Array<{ directory: string; manifest: PluginManifest; sourceIndex: number }> = []
+  for (const [sourceIndex, pluginDirectory] of existingDirectories.entries()) {
+    const directories = fs.readdirSync(pluginDirectory, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => path.join(pluginDirectory, entry.name))
+      .sort()
 
-  for (const directory of directories) {
-    const manifestPath = path.join(directory, 'plugin.json')
-    if (!fs.existsSync(manifestPath))
-      continue
-    try {
-      const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
-      candidates.push({ directory, manifest: parseManifest(raw) })
-    }
-    catch (error: any) {
-      nextLoadErrors.push({ directory, message: error?.message || String(error) })
+    for (const directory of directories) {
+      const manifestPath = path.join(directory, 'plugin.json')
+      if (!fs.existsSync(manifestPath))
+        continue
+      try {
+        const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+        candidates.push({ directory, manifest: parseManifest(raw), sourceIndex })
+      }
+      catch (error: any) {
+        nextLoadErrors.push({ directory, message: error?.message || String(error) })
+      }
     }
   }
 
-  const duplicateIds = new Set<string>()
-  const idCounts = new Map<string, number>()
-  for (const candidate of candidates)
-    idCounts.set(candidate.manifest.id, (idCounts.get(candidate.manifest.id) || 0) + 1)
-  for (const [id, count] of idCounts) {
-    if (count > 1)
-      duplicateIds.add(id)
+  const candidatesById = new Map<string, typeof candidates>()
+  for (const candidate of candidates) {
+    const group = candidatesById.get(candidate.manifest.id) || []
+    group.push(candidate)
+    candidatesById.set(candidate.manifest.id, group)
   }
 
-  for (const { directory, manifest } of candidates) {
-    if (duplicateIds.has(manifest.id)) {
-      nextLoadErrors.push({ directory, id: manifest.id, name: manifest.name, message: `插件 ID 重复: ${manifest.id}` })
+  const selectedCandidates: typeof candidates = []
+  for (const group of candidatesById.values()) {
+    const highestSourceIndex = Math.max(...group.map(candidate => candidate.sourceIndex))
+    const preferredCandidates = group.filter(candidate => candidate.sourceIndex === highestSourceIndex)
+    if (preferredCandidates.length > 1) {
+      for (const { directory, manifest } of preferredCandidates)
+        nextLoadErrors.push({ directory, id: manifest.id, name: manifest.name, message: `插件 ID 重复: ${manifest.id}` })
       continue
     }
+
+    const selectedCandidate = preferredCandidates[0]
+    if (group.length > 1)
+      globalThis.console.log(`External plugin overrides bundled plugin: ${selectedCandidate.manifest.name} (${selectedCandidate.manifest.id})`)
+    selectedCandidates.push(selectedCandidate)
+  }
+
+  for (const { directory, manifest } of selectedCandidates) {
     try {
       const plugin = await loadPlugin(directory, manifest, generation)
       nextLoadedPlugins.set(manifest.id, plugin)

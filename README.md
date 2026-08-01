@@ -156,7 +156,7 @@ docker run -d \
 
 ### Docker Compose
 
-将 [docker-compose/docker-compose.yml](./docker-compose/docker-compose.yml) 复制到独立部署目录，编辑管理员邮箱和密钥，并在同级创建 `plugins/` 目录。Compose 会将该目录只读挂载到容器：
+将 [docker-compose/docker-compose.yml](./docker-compose/docker-compose.yml) 复制到独立部署目录，编辑管理员邮箱和密钥，并在同级创建 `plugins/` 目录。镜像自带绘图插件，Compose 会将该目录作为互不遮盖的外挂插件目录只读挂载到容器：
 
 ```bash
 docker-compose up -d

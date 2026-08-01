@@ -111,7 +111,7 @@
 
 ### 4.4 插件运行时
 
-- 服务启动时扫描 `PLUGIN_DIR`（默认根目录 `plugins/`）下的一级子目录，校验 `plugin.json` 后动态加载 TypeScript 入口。管理员也可在插件页面点击“刷新”手动重新扫描；扫描完成后原子替换内存注册表。
+- 服务启动时同时扫描镜像内置插件目录和 `PLUGIN_DIR`（本地默认根目录 `plugins/`）下的一级子目录，校验 `plugin.json` 后动态加载 TypeScript 入口；外挂插件与内置插件 ID 相同时优先加载外挂版本。管理员也可在插件页面点击“刷新”手动重新扫描；扫描完成后原子替换内存注册表。
 - 插件入口默认导出 `BasePlugin` 子类；使用 `@llmTool` 标记的方法会自动成为 Function Call 工具，一个插件可以提供多个工具。
 - `plugin.json.id` 是去掉连字符的 32 位小写 GUID，也是数据库与用户状态的稳定主键；插件名称和工具名称均不设置数据库唯一约束。
 - 管理员可以使用未发布插件，也可以将插件发布给普通用户。每个用户独立启用或停用插件；启用时若任一工具名与已启用插件重复，服务端拒绝操作并提示冲突插件。
@@ -233,7 +233,7 @@ API Key 和允许使用的模型主要在管理后台的密钥管理页面配置
 - 前端构建：`pnpm build`，包含 `vue-tsc --noEmit` 和 Vite 构建。
 - 后端构建：在 `service/` 运行 `pnpm build`，由 `tsup` 输出到 `service/build/`。
 - Docker：多阶段构建前端与后端，最终镜像在 `/app/public` 提供前端资源，通过 Node.js 启动后端并监听 `3002`。
-- Docker Compose：默认映射 `3002:3002`，持久化 `/app/data` 与 `/app/uploads`，并将 Compose 部署目录下的 `plugins/` 只读挂载到 `/app/plugins`；可选 Nginx 反向代理。
+- Docker Compose：默认映射 `3002:3002`，持久化 `/app/data` 与 `/app/uploads`，镜像内置插件位于 `/app/builtin-plugins`，并将 Compose 部署目录下的外挂 `plugins/` 只读挂载到 `/app/plugins`；可选 Nginx 反向代理。
 
 SQLite 原生依赖需要 `python3`、`make`、`g++` 和 SQLite 开发库；Dockerfile 已安装并重新构建 `sqlite3`。
 

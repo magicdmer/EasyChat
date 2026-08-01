@@ -62,11 +62,13 @@ FROM node:${NODE_VERSION}-alpine AS runtime
 
 WORKDIR /app
 
+ENV BUILTIN_PLUGIN_DIR=/app/builtin-plugins
+
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=production-dependencies /app/plugin-sdk ./plugin-sdk
 COPY --from=frontend /app/dist ./public
 COPY --from=backend /app/build ./build
-COPY plugins ./plugins
+COPY plugins ./builtin-plugins
 
 RUN mkdir -p ./data ./uploads
 

@@ -157,7 +157,7 @@ Open `http://localhost:3002`.
 
 ### Docker Compose
 
-Copy [docker-compose/docker-compose.yml](./docker-compose/docker-compose.yml) into a standalone deployment directory, edit the administrator email and secret, and create a sibling `plugins/` directory. Compose mounts that directory into the container as read-only:
+Copy [docker-compose/docker-compose.yml](./docker-compose/docker-compose.yml) into a standalone deployment directory, edit the administrator email and secret, and create a sibling `plugins/` directory. The image includes the image-generation plugin, while Compose mounts that directory as a separate read-only external plugin directory without hiding bundled plugins:
 
 ```bash
 docker-compose up -d
