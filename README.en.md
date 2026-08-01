@@ -4,8 +4,6 @@
 
 EasyChat is a self-hosted, multi-model AI chat application with Simplified Chinese as its default interface. It connects to different model providers through OpenAI-compatible APIs and includes conversation management, users and keys, multimodal chat, image generation, plugin tools, and usage analytics.
 
-Current version: `1.0.2`
-
 > EasyChat evolved from [Chanzhaoyu/chatgpt-web](https://github.com/Chanzhaoyu/chatgpt-web) and contains extensive independent enhancements. See [LICENSE](./LICENSE) for the applicable copyright and license notices.
 
 ## Features
@@ -29,16 +27,13 @@ These screenshots are retained as feature references and will be replaced with t
 
 ### Login and chat
 
-![Login](./docs/login.jpg)
-![Chat interface 1](./docs/c1.png)
-![Chat interface 2](./docs/c2.png)
+![Login](./docs/login.png)
+![Chat interface 1](./docs/chat.png)
 
 ### Settings and administration
 
-![Base settings](./docs/basesettings.jpg)
-![Conversation prompt](./docs/prompt_en.jpg)
-![User management](./docs/user-manager.jpg)
-![API key management](./docs/key-manager-en.jpg)
+![Base settings](./docs/basesettings.png)
+
 
 ## Technology
 

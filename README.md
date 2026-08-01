@@ -4,8 +4,6 @@
 
 EasyChat 是一个简单的、面向自托管场景的多用户 AI 聊天应用。项目通过 OpenAI + NewAPI的方式兼容不同模型服务，并提供会话管理、用户与密钥管理、图文对话、图片生成、插件工具和使用量统计等能力。主要是用作个人使用，并分享给朋友或者亲戚。不适合商用。
 
-当前版本：`1.0.2`
-
 > EasyChat 基于 [Chanzhaoyu/chatgpt-web](https://github.com/Chanzhaoyu/chatgpt-web) 开发，做了大量修改。原项目的版权与许可声明见 [LICENSE](./LICENSE)。
 
 ## 主要功能
