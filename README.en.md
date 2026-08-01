@@ -4,7 +4,7 @@
 
 EasyChat is a self-hosted, multi-model AI chat application with Simplified Chinese as its default interface. It connects to different model providers through OpenAI-compatible APIs and includes conversation management, users and keys, multimodal chat, image generation, plugin tools, and usage analytics.
 
-Current version: `1.0.0`
+Current version: `1.0.2`
 
 > EasyChat evolved from [Chanzhaoyu/chatgpt-web](https://github.com/Chanzhaoyu/chatgpt-web) and contains extensive independent enhancements. See [LICENSE](./LICENSE) for the applicable copyright and license notices.
 
@@ -143,14 +143,14 @@ pnpm build
 ### Local image
 
 ```bash
-docker build -t easychat:1.0.0 .
+docker build -t easychat:1.0.2 .
 docker run -d \
   --name easychat \
   -p 3002:3002 \
   -v easychat-data:/app/data \
   -v easychat-uploads:/app/uploads \
   -e AUTH_SECRET_KEY=replace-with-a-random-secret \
-  easychat:1.0.0
+  easychat:1.0.2
 ```
 
 Open `http://localhost:3002`.
