@@ -3,6 +3,7 @@ import type { PluginOption } from 'vite'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
+import packageInfo from './package.json'
 
 function setupPlugins(env: ImportMetaEnv): PluginOption[] {
   return [
@@ -35,6 +36,7 @@ export default defineConfig((env) => {
       },
     },
     define: {
+      __APP_VERSION__: JSON.stringify(packageInfo.version),
       __VUE_I18N_FULL_INSTALL__: true,
       __VUE_I18N_LEGACY_API__: false,
       __INTLIFY_PROD_DEVTOOLS__: false,

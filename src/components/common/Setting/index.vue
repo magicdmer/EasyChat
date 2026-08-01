@@ -4,7 +4,8 @@ import { NModal, NTabPane, NTabs } from 'naive-ui'
 import General from './General.vue'
 import Advanced from './Advanced.vue'
 import Statistics from './Statistics.vue'
-import About from './About.vue'
+import BaseConfig from './About.vue'
+import ProjectAbout from './ProjectAbout.vue'
 import Site from './Site.vue'
 import Mail from './Mail.vue'
 import User from './User.vue'
@@ -86,7 +87,7 @@ const show = computed({
             <SvgIcon class="text-lg" icon="ri:list-settings-line" />
             <span class="ml-2">{{ $t('setting.config') }}</span>
           </template>
-          <About />
+          <BaseConfig />
         </NTabPane>
         <NTabPane v-if="userStore.userInfo.root" name="SiteConfig" tab="SiteConfig">
           <template #tab>
@@ -115,6 +116,13 @@ const show = computed({
             <span class="ml-2">{{ $t('setting.keysConfig') }}</span>
           </template>
           <Key />
+        </NTabPane>
+        <NTabPane name="About" tab="About">
+          <template #tab>
+            <SvgIcon class="text-lg" icon="ri:information-line" />
+            <span class="ml-2">{{ $t('setting.about') }}</span>
+          </template>
+          <ProjectAbout />
         </NTabPane>
       </NTabs>
     </div>

@@ -1,3 +1,5 @@
+declare const __APP_VERSION__: string
+
 interface Window {
   $loadingBar?: import('naive-ui').LoadingBarProviderInst;
   $dialog?: import('naive-ui').DialogProviderInst;
