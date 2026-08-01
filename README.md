@@ -2,11 +2,11 @@
 
 [中文](./README.md) | [English](./README.en.md)
 
-EasyChat 是一个以中文体验为默认、面向自托管场景的多模型 AI 聊天应用。项目通过 OpenAI 兼容接口连接不同模型服务，并提供会话管理、用户与密钥管理、图文对话、图片生成、插件工具和使用量统计等能力。
+EasyChat 是一个简单的、面向自托管场景的多用户 AI 聊天应用。项目通过 OpenAI + NewAPI的方式兼容不同模型服务，并提供会话管理、用户与密钥管理、图文对话、图片生成、插件工具和使用量统计等能力。主要是用作个人使用，并分享给朋友或者亲戚。不适合商用。
 
 当前版本：`1.0.0`
 
-> EasyChat 基于 [Chanzhaoyu/chatgpt-web](https://github.com/Chanzhaoyu/chatgpt-web) 演进，并进行了大量独立扩展。原项目的版权与许可声明见 [LICENSE](./LICENSE)。
+> EasyChat 基于 [Chanzhaoyu/chatgpt-web](https://github.com/Chanzhaoyu/chatgpt-web) 开发，做了大量修改。原项目的版权与许可声明见 [LICENSE](./LICENSE)。
 
 ## 主要功能
 
@@ -20,6 +20,7 @@ EasyChat 是一个以中文体验为默认、面向自托管场景的多模型 A
 - 内置图片生成插件，模型由管理员统一配置
 - 简体中文、繁体中文和英文界面，默认使用简体中文
 - Docker、Docker Compose 和 PWA 支持
+- 支持高级模式切换，默认关闭适合小白用户
 
 详细实现说明见 [工程架构文档](./docs/ARCHITECTURE.md)。
 
@@ -29,16 +30,14 @@ EasyChat 是一个以中文体验为默认、面向自托管场景的多模型 A
 
 ### 登录与聊天
 
-![登录界面](./docs/login.jpg)
-![聊天界面一](./docs/c1.png)
-![聊天界面二](./docs/c2.png)
+![登录界面](./docs/login.png)
+
+![聊天界面](./docs/chat.png)
 
 ### 设置与管理
 
-![基础设置](./docs/basesettings.jpg)
-![会话 Prompt](./docs/prompt.jpg)
-![用户管理](./docs/user-manager.jpg)
-![Key 管理](./docs/key-manager.jpg)
+![基础设置](./docs/basesettings.png)
+
 
 ## 技术栈
 
@@ -180,6 +179,12 @@ EasyChat/
 ## 贡献
 
 提交改动前请阅读 [贡献指南](./CONTRIBUTING.md)。建议至少执行前端 `pnpm build` 和后端 `service/pnpm build`。
+
+## 赞助
+
+| 支付宝                   | 微信                   |
+| ------------------------ | ---------------------- |
+| ![](./docs/zhifubao.jpg) | ![](./docs/weixin.png) |
 
 ## 许可证
 
