@@ -127,7 +127,6 @@ export default {
     statisticsCompletion: 'Response',
     statisticsTotal: 'Total',
     statisticsAllUsers: 'All users',
-    statisticsEyebrow: 'Usage intelligence',
     statisticsOverview: 'Usage overview',
     statisticsDescription: 'Review request volume, token flow, and the main sources of usage.',
     statisticsRequests: 'Requests',

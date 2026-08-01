@@ -12,7 +12,10 @@ const chatStore = useChatStore()
 const currentChatHistory = computed(() => chatStore.getChatHistoryByCurrentActive)
 const ms = useMessage()
 const testing = ref(false)
-const title = `Prompt For [${currentChatHistory.value?.title}]`
+const title = computed(() => {
+  const chatTitle = currentChatHistory.value?.title
+  return chatTitle ? `${t('chat.roomPrompt')} · ${chatTitle}` : t('chat.roomPrompt')
+})
 
 interface Props {
   visible: boolean
@@ -33,7 +36,7 @@ const show = computed({
 })
 
 async function handleSaveChatRoomPrompt() {
-  if (!currentChatHistory.value || !currentChatHistory.value)
+  if (!currentChatHistory.value)
     return
 
   testing.value = true
@@ -51,20 +54,31 @@ async function handleSaveChatRoomPrompt() {
 
 <template>
   <NModal
-    v-model:show="show" :auto-focus="false" class="custom-card" preset="card" :style="{ width: '600px' }" :title="title" size="huge"
+    v-model:show="show"
+    :auto-focus="false"
+    class="custom-card"
+    preset="card"
+    :style="{
+      width: '560px',
+      maxWidth: 'calc(100vw - 32px)',
+      maxHeight: 'calc(100dvh - 32px)',
+      overflow: 'hidden',
+    }"
+    :content-style="{ minHeight: 0, overflowY: 'auto' }"
+    :title="title"
+    size="huge"
     :bordered="false"
   >
-    <!-- <template #header-extra>
-      噢!
-    </template> -->
     <NInput
       :value="currentChatHistory && currentChatHistory.prompt"
       type="textarea"
-      :autosize="{ minRows: 4, maxRows: 10 }" placeholder="Prompt for this room, If empty will use Settings ->  Advanced -> Role" @input="(val) => { if (currentChatHistory) currentChatHistory.prompt = val }"
+      :autosize="{ minRows: 5, maxRows: 10 }"
+      placeholder="Prompt for this room, If empty will use Settings -> Advanced -> Role"
+      @input="(val) => { if (currentChatHistory) currentChatHistory.prompt = val }"
     />
     <template #footer>
       <NSpace justify="end">
-        <NButton :loading="testing" type="success" @click="handleSaveChatRoomPrompt">
+        <NButton :loading="testing" type="primary" @click="handleSaveChatRoomPrompt">
           {{ t('common.save') }}
         </NButton>
       </NSpace>

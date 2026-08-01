@@ -216,9 +216,6 @@ onMounted(async () => {
     <section class="usage-page">
       <header class="usage-header">
         <div>
-          <p class="usage-eyebrow">
-            {{ $t('setting.statisticsEyebrow') }}
-          </p>
           <h2 class="usage-title">
             {{ $t('setting.statisticsOverview') }}
           </h2>
@@ -378,15 +375,6 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 20px;
-}
-
-.usage-eyebrow {
-  margin: 0 0 5px;
-  color: var(--brand-primary);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .14em;
-  text-transform: uppercase;
 }
 
 .usage-title {

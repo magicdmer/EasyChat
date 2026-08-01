@@ -43,9 +43,21 @@ const show = computed({
 </script>
 
 <template>
-  <NModal v-model:show="show" :auto-focus="false" preset="card" :style="{ 'width': !isMobile ? '80%' : '100%', 'min-height': !isMobile ? '800px' : 'auto' }">
-    <div>
-      <NTabs v-model:value="active" type="line" animated>
+  <NModal
+    v-model:show="show"
+    :auto-focus="false"
+    preset="card"
+    class="setting-modal"
+    :content-style="{ display: 'flex', minHeight: 0, overflow: 'hidden' }"
+    :style="{
+      width: '1120px',
+      maxWidth: `calc(100vw - ${isMobile ? 16 : 32}px)`,
+      height: `min(800px, calc(100dvh - ${isMobile ? 16 : 32}px))`,
+      overflow: 'hidden',
+    }"
+  >
+    <div class="setting-modal-content">
+      <NTabs v-model:value="active" type="line" :animated="false" class="setting-tabs">
         <NTabPane name="General" tab="General">
           <template #tab>
             <SvgIcon class="text-lg" icon="ri:file-user-line" />
@@ -69,7 +81,7 @@ const show = computed({
             <SvgIcon class="text-lg" icon="ri:bar-chart-box-line" />
             <span class="ml-2">{{ $t('setting.statistics') }}</span>
           </template>
-          <div class="min-h-[100px]">
+          <div>
             <Statistics />
           </div>
         </NTabPane>
@@ -128,3 +140,30 @@ const show = computed({
     </div>
   </NModal>
 </template>
+
+<style scoped>
+.setting-modal {
+  overflow: hidden;
+}
+
+.setting-modal-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.setting-tabs {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.setting-tabs :deep(.n-tab-pane) {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+</style>

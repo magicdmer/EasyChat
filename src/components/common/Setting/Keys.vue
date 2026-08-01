@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { h, onMounted, reactive, ref } from 'vue'
-import { NButton, NDataTable, NInput, NModal, NSelect, NSpace, NSwitch, NTag, useDialog, useMessage } from 'naive-ui'
+import { NButton, NDataTable, NForm, NFormItem, NInput, NModal, NSelect, NSpace, NSwitch, NTag, useDialog, useMessage } from 'naive-ui'
 import { KeyConfig, Status, UserRole, userRoleOptions } from './model'
 import { fetchGetKeys, fetchOpenAIModels, fetchUpdateApiKeyStatus, fetchUpsertApiKey } from '@/api'
 import { t } from '@/locales'
@@ -386,88 +386,102 @@ onMounted(async () => {
     </div>
   </div>
 
-  <NModal v-model:show="show" :auto-focus="false" preset="card" :style="{ width: !isMobile ? '50%' : '100%' }">
-    <div class="p-4 space-y-5 min-h-[200px]">
-      <div class="space-y-6">
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.api') }}</span>
-          <div class="flex-1">
-            <NInput
-              v-model:value="keyConfig.key" type="textarea"
-              :autosize="{ minRows: 3, maxRows: 4 }" placeholder=""
-            />
-          </div>
-        </div>
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.apiBaseUrl') }}</span>
-          <div class="flex-1">
-            <NInput
-              v-model:value="keyConfig.apiBaseUrl" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 2 }" placeholder=""
-            />
-          </div>
-        </div>
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.chatModels') }}</span>
-          <div class="flex-1">
-            <div class="flex items-center space-x-2">
-              <NSelect
-                style="width: 100%"
-                multiple
-                filterable
-                :filter="filterSelectOption"
-                :value="keyConfig.chatModels"
-                :options="modelOptions"
-                :render-tag="renderModelTag"
-                @update-value="value => keyConfig.chatModels = value"
-              />
-              <NButton
-                class="justify-center min-w-[72px]"
-                type="primary"
-                :disabled="!keyConfig.key || refreshingModels"
-                @click="handleRefreshModels"
-              >
-                <template v-if="refreshingModels">
-                  <span class="inline-flex items-center justify-center w-full">
-                    <span class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  </span>
-                </template>
-                <template v-else>
-                  {{ $t('common.refresh') || '刷新' }}
-                </template>
-              </NButton>
-            </div>
-          </div>
-        </div>
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.userRoles') }}</span>
-          <div class="flex-1">
-            <NSelect
-              style="width: 100%"
-              multiple
-              :value="keyConfig.userRoles"
-              :options="userRoleOptions"
-              @update-value="value => keyConfig.userRoles = value"
-            />
-          </div>
-        </div>
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.status') }}</span>
-          <div class="flex-1">
-            <NSwitch
-              :round="false"
-              :value="keyConfig.status === Status.Normal"
-              @update:value="(val) => { keyConfig.status = val ? Status.Normal : Status.Disabled }"
-            />
-          </div>
-        </div>
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]" />
-          <NButton type="primary" :loading="handleSaving" @click="handleUpdateKeyConfig()">
-            {{ $t('common.save') }}
+  <NModal
+    v-model:show="show"
+    :auto-focus="false"
+    preset="card"
+    :title="keyConfig.id ? $t('chat.editKeyButton') : $t('setting.addKey')"
+    :style="{
+      width: '640px',
+      maxWidth: `calc(100vw - ${isMobile ? 16 : 32}px)`,
+      maxHeight: `calc(100dvh - ${isMobile ? 16 : 32}px)`,
+      overflow: 'hidden',
+    }"
+    :content-style="{ minHeight: 0, overflowY: 'auto' }"
+  >
+    <NForm
+      :label-placement="isMobile ? 'top' : 'left'"
+      :label-width="isMobile ? 'auto' : 100"
+      label-align="left"
+      require-mark-placement="right-hanging"
+    >
+      <NFormItem :label="$t('setting.api')" required>
+        <NInput
+          v-model:value="keyConfig.key"
+          type="password"
+          show-password-on="click"
+          placeholder="sk-..."
+        />
+      </NFormItem>
+
+      <NFormItem :label="$t('setting.apiBaseUrl')">
+        <NInput v-model:value="keyConfig.apiBaseUrl" placeholder="https://api.openai.com/v1" />
+      </NFormItem>
+
+      <NFormItem :label="$t('setting.chatModels')">
+        <div class="key-model-control">
+          <NSelect
+            :to="true"
+            multiple
+            filterable
+            :filter="filterSelectOption"
+            :value="keyConfig.chatModels"
+            :options="modelOptions"
+            :render-tag="renderModelTag"
+            @update-value="value => keyConfig.chatModels = value"
+          />
+          <NButton
+            class="justify-center min-w-[72px]"
+            type="primary"
+            :disabled="!keyConfig.key || refreshingModels"
+            @click="handleRefreshModels"
+          >
+            <template v-if="refreshingModels">
+              <span class="inline-flex items-center justify-center w-full">
+                <span class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              </span>
+            </template>
+            <template v-else>
+              {{ $t('common.refresh') || '刷新' }}
+            </template>
           </NButton>
         </div>
-      </div>
-    </div>
+      </NFormItem>
+
+      <NFormItem :label="$t('setting.userRoles')">
+        <NSelect
+          :to="true"
+          multiple
+          :value="keyConfig.userRoles"
+          :options="userRoleOptions"
+          @update-value="value => keyConfig.userRoles = value"
+        />
+      </NFormItem>
+
+      <NFormItem :label="$t('setting.status')" :show-feedback="false">
+        <NSwitch
+          :round="false"
+          :value="keyConfig.status === Status.Normal"
+          @update:value="(val) => { keyConfig.status = val ? Status.Normal : Status.Disabled }"
+        />
+      </NFormItem>
+    </NForm>
+
+    <template #footer>
+      <NSpace justify="end">
+        <NButton type="primary" :loading="handleSaving" @click="handleUpdateKeyConfig()">
+          {{ $t('common.save') }}
+        </NButton>
+      </NSpace>
+    </template>
   </NModal>
 </template>
+
+<style scoped>
+.key-model-control {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+</style>

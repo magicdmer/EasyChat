@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { computed, h, onMounted, reactive, ref } from 'vue'
-import { NButton, NDataTable, NInput, NModal, NSelect, NSpace, NTag, useDialog, useMessage } from 'naive-ui'
+import { NButton, NDataTable, NForm, NFormItem, NInput, NModal, NSelect, NSpace, NTag, useDialog, useMessage } from 'naive-ui'
 import { Status, UserInfo, UserRole, userRoleOptions } from './model'
 import { fetchGetUsers, fetchUpdateUser, fetchUpdateUserStatus } from '@/api'
 import { t } from '@/locales'
@@ -290,62 +290,67 @@ onMounted(async () => {
     </div>
   </div>
 
-  <NModal v-model:show="show" :auto-focus="false" preset="card" :style="{ width: !isMobile ? '33%' : '100%' }">
-    <div class="p-4 space-y-5 min-h-[200px]">
-      <div class="space-y-6">
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.email') }}</span>
-          <div class="flex-1">
-            <NInput
-              v-model:value="userRef.email"
-              :disabled="userRef.id !== undefined"
-              :status="emailStatus"
-              placeholder="name@example.com"
-            />
-            <div v-if="emailStatus === 'error'" class="mt-1 text-xs text-red-500">
-              请输入格式正确的邮箱
-            </div>
-          </div>
-        </div>
+  <NModal
+    v-model:show="show"
+    :auto-focus="false"
+    preset="card"
+    :title="userRef.id ? $t('chat.editUser') : $t('setting.addUser')"
+    :style="{
+      width: '480px',
+      maxWidth: `calc(100vw - ${isMobile ? 16 : 32}px)`,
+      maxHeight: `calc(100dvh - ${isMobile ? 16 : 32}px)`,
+      overflow: 'hidden',
+    }"
+    :content-style="{ minHeight: 0, overflowY: 'auto' }"
+  >
+    <NForm
+      :label-placement="isMobile ? 'top' : 'left'"
+      :label-width="isMobile ? 'auto' : 88"
+      label-align="left"
+      require-mark-placement="right-hanging"
+    >
+      <NFormItem :label="$t('setting.email')" required>
+        <NInput
+          v-model:value="userRef.email"
+          :disabled="userRef.id !== undefined"
+          :status="emailStatus"
+          placeholder="name@example.com"
+        />
+        <template v-if="emailStatus === 'error'" #feedback>
+          请输入格式正确的邮箱
+        </template>
+      </NFormItem>
 
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.password') }}</span>
-          <div class="flex-1">
-            <NInput
-              v-model:value="userRef.password"
-              type="password"
-              placeholder="password"
-            />
-          </div>
-        </div>
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.userRoles') }}</span>
-          <div class="flex-1">
-            <NSelect
-              style="width: 100%"
-              multiple
-              :value="userRef.roles"
-              :options="userRoleOptions"
-              @update-value="value => userRef.roles = value"
-            />
-          </div>
-        </div>
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]">{{ $t('setting.remark') }}</span>
-          <div class="flex-1">
-            <NInput
-              v-model:value="userRef.remark" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 2 }" placeholder=""
-            />
-          </div>
-        </div>
-        <div class="flex items-center space-x-4">
-          <span class="flex-shrink-0 w-[100px]" />
-          <NButton type="primary" :loading="handleSaving" @click="handleUpdateUser()">
-            {{ $t('common.save') }}
-          </NButton>
-        </div>
-      </div>
-    </div>
+      <NFormItem :label="$t('setting.password')" :required="!userRef.id">
+        <NInput
+          v-model:value="userRef.password"
+          type="password"
+          show-password-on="click"
+          placeholder="password"
+        />
+      </NFormItem>
+
+      <NFormItem :label="$t('setting.userRoles')">
+        <NSelect
+          :to="true"
+          multiple
+          :value="userRef.roles"
+          :options="userRoleOptions"
+          @update-value="value => userRef.roles = value"
+        />
+      </NFormItem>
+
+      <NFormItem :label="$t('setting.remark')" :show-feedback="false">
+        <NInput v-model:value="userRef.remark" />
+      </NFormItem>
+    </NForm>
+
+    <template #footer>
+      <NSpace justify="end">
+        <NButton type="primary" :loading="handleSaving" @click="handleUpdateUser()">
+          {{ $t('common.save') }}
+        </NButton>
+      </NSpace>
+    </template>
   </NModal>
 </template>

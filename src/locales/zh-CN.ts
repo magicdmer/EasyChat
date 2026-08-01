@@ -127,7 +127,6 @@ export default {
     statisticsCompletion: '回答',
     statisticsTotal: '总计',
     statisticsAllUsers: '全部用户',
-    statisticsEyebrow: 'Usage intelligence',
     statisticsOverview: '用量概览',
     statisticsDescription: '快速了解请求规模、Token 流向与主要消耗来源。',
     statisticsRequests: '请求次数',
