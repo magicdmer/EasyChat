@@ -3,6 +3,9 @@ import { computed, watch } from 'vue'
 import { darkTheme, useOsTheme } from 'naive-ui'
 import { useAppStore } from '@/store'
 
+const LIGHT_THEME_COLOR = '#F9FAFB'
+const DARK_THEME_COLOR = '#171717'
+
 export function useTheme() {
   const appStore = useAppStore()
 
@@ -69,10 +72,17 @@ export function useTheme() {
   watch(
     () => isDark.value,
     (dark) => {
-      if (dark)
+      if (dark) {
         document.documentElement.classList.add('dark')
-      else
+      }
+      else {
         document.documentElement.classList.remove('dark')
+      }
+
+      const themeColor = dark ? DARK_THEME_COLOR : LIGHT_THEME_COLOR
+      document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+        ?.setAttribute('content', themeColor)
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
     },
     { immediate: true },
   )

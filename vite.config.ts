@@ -13,7 +13,7 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
       manifest: {
         name: '简聊',
         short_name: '简聊',
-        theme_color: '#6366F1',
+        theme_color: '#F9FAFB',
         background_color: '#FFFFFF',
         display: 'standalone',
         start_url: '/',
