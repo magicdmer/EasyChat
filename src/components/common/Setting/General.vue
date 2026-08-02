@@ -219,9 +219,9 @@ function handleImportButtonClick(): void {
       </div>
       <div class="flex items-center space-x-4">
         <span class="flex-shrink-0 w-[100px]">{{ $t('setting.defaultChatModel') }}</span>
-        <div class="flex-1">
+        <div class="flex-1 min-w-0">
           <NSelect
-            style="width: 200px"
+            class="w-full max-w-[200px]"
             :value="chatModel"
             :options="authStore.session?.chatModels"
             :placeholder="$t('setting.defaultChatModelTip')"
