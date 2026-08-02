@@ -140,14 +140,14 @@ pnpm build
 ### 本地构建
 
 ```bash
-docker build -t easychat:1.0.3 .
+docker build -t easychat:1.0.4 .
 docker run -d \
   --name easychat \
   -p 3002:3002 \
   -v easychat-data:/app/data \
   -v easychat-uploads:/app/uploads \
   -e AUTH_SECRET_KEY=replace-with-a-random-secret \
-  easychat:1.0.3
+  easychat:1.0.4
 ```
 
 访问 `http://localhost:3002`。
