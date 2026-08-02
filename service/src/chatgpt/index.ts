@@ -12,6 +12,7 @@ import { sendResponse } from '../utils'
 import { hasAnyRole, isNotEmptyString } from '../utils/is'
 import type { ChatContext, ModelConfig } from '../types'
 import { getChatByMessageId } from '../storage/sqlite'
+import { generateImage } from '../imageGeneration'
 import type { RequestOptions, ChatMessage } from './types'
 import { executeToolForUser, getToolsForUser, resolveToolForUser } from '../plugins'
 
@@ -63,19 +64,32 @@ async function chatReplyProcess(options: RequestOptions) {
 
   if (options.draw) {
     const abort = new AbortController()
+    processThreads.push({ userId, abort, messageId, chatUuid: options.chatUuid })
     try {
-      const { result } = await executeToolForUser(options.user, 'generate_image', { prompt: message }, abort.signal)
-
-      const dataRes = {
-        status: 'Success',
-        message: '',
-        text: result,
-      }
-
-      return sendResponse({ type: 'Success', data: dataRes })
+      const result = await generateImage({ prompt: message, model: chatModel }, abort.signal, async () => {
+        const key = await getRandomApiKey(options.user, chatModel)
+        if (!key)
+          throw new Error('没有可用的配置。请再试一次 | No available configuration. Please try again.')
+        return key
+      })
+      return sendResponse({
+        type: 'Success',
+        data: {
+          id: messageId,
+          conversationId: lastContext?.conversationId ?? crypto.randomUUID(),
+          status: 'Success',
+          message: '',
+          text: result,
+        },
+      })
     }
     catch (error: any) {
       return sendResponse({ type: 'Fail', message: error.message ?? error })
+    }
+    finally {
+      const index = processThreads.findIndex(thread => thread.messageId === messageId)
+      if (index > -1)
+        processThreads.splice(index, 1)
     }
   }
 
