@@ -6,6 +6,7 @@ export interface RequestProps {
   regenerate: boolean
   prompt: string
   images?: string[]
+  attachedImages?: string[]
   options?: ChatContext
   systemMessage: string
   temperature?: number

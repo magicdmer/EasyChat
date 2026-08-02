@@ -16,6 +16,7 @@ export function fetchChatAPIProcess<T = any>(
     regenerate?: boolean
     prompt: string
     images?: string[]
+    attachedImages?: string[]
     options?: { conversationId?: string; parentMessageId?: string }
     signal?: GenericAbortSignal
     draw?: boolean
@@ -30,6 +31,7 @@ export function fetchChatAPIProcess<T = any>(
     regenerate: params.regenerate || false,
     prompt: params.prompt,
     images: params.images,
+    attachedImages: params.attachedImages,
     options: params.options,
     draw: params.draw,
     autoContinue: params.autoContinue,

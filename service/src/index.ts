@@ -644,7 +644,7 @@ router.post('/chat-clear', auth, async (req, res) => {
 router.post('/chat-process', [auth, limiter], async (req, res) => {
   res.setHeader('Content-type', 'application/octet-stream')
 
-  let { roomId, uuid, regenerate, prompt, images = [], options = {}, systemMessage, temperature, top_p, draw, autoContinue } = req.body as RequestProps
+  let { roomId, uuid, regenerate, prompt, images = [], attachedImages, options = {}, systemMessage, temperature, top_p, draw, autoContinue } = req.body as RequestProps
   const userId = req.headers.userId as string
   const room = await getChatRoom(userId, roomId)
   if (room == null)
@@ -658,10 +658,12 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
     const userId = req.headers.userId.toString()
     const user = await getUserById(userId)
 
-    // 若携带图片，写入用户消息时附加 Markdown 以便历史可视
+    // images 包含模型实际输入（可能由历史自动回填）；attachedImages 只包含用户本次显式上传的附件。
+    // 旧客户端未传 attachedImages 时回退到 images，保持原有接口兼容性。
+    const visibleImages = Array.isArray(attachedImages) ? attachedImages : images
     let userTextForInsert = prompt
-    if (!regenerate && Array.isArray(images) && images.length > 0) {
-      const attachmentsMarkdown = images.map((u: string) => `![image](${buildAbsoluteUrl(u)})`).join('\n')
+    if (!regenerate && Array.isArray(visibleImages) && visibleImages.length > 0) {
+      const attachmentsMarkdown = visibleImages.map((u: string) => `![image](${buildAbsoluteUrl(u)})`).join('\n')
       userTextForInsert = attachmentsMarkdown ? `${prompt}\n\n${attachmentsMarkdown}` : prompt
     }
     message = regenerate

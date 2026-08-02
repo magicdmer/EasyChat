@@ -148,6 +148,7 @@ interface ChatStreamOptions {
   message: string
   options: Chat.ConversationRequest
   images: string[]
+  attachedImages?: string[]
   signal: AbortSignal
   regenerate?: boolean
   responseCount?: number
@@ -230,6 +231,7 @@ async function processChatStream(streamOptions: ChatStreamOptions): Promise<void
     regenerate: streamOptions.regenerate,
     prompt: streamOptions.images.length > 0 ? stripImageFromMarkdown(streamOptions.message) : streamOptions.message,
     images: streamOptions.images.length > 0 ? streamOptions.images : undefined,
+    attachedImages: streamOptions.attachedImages,
     options: streamOptions.options,
     draw: appStore.advancedMode ? usingDraw.value : false,
     autoContinue: openLongReply,
@@ -266,14 +268,15 @@ async function onConversation() {
     return
 
   // 复制当前待发送的附件，并立即清空预览以避免粘贴后发送时预览残留
-  const imagesToSend = attachedImageUrls.value.length > 0 ? [...attachedImageUrls.value] : []
-  if (imagesToSend.length > 0)
+  const attachedImages = attachedImageUrls.value.length > 0 ? [...attachedImageUrls.value] : []
+  const imagesToSend = [...attachedImages]
+  if (attachedImages.length > 0)
     attachedImageUrls.value = []
 
   const ctrl = createController(+uuid)
 
   const chatUuid = Date.now()
-  const attachmentsMarkdown = imagesToSend.length > 0 ? imagesToSend.map(u => `![image](${toAbsolute(u)})`).join('\n') : ''
+  const attachmentsMarkdown = attachedImages.length > 0 ? attachedImages.map(u => `![image](${toAbsolute(u)})`).join('\n') : ''
   const userText = attachmentsMarkdown ? `${message}\n\n${attachmentsMarkdown}` : message
   addChat(
     +uuid,
@@ -284,7 +287,7 @@ async function onConversation() {
       inversion: true,
       error: false,
       conversationOptions: null,
-      requestOptions: { prompt: message, options: null, images: imagesToSend.length > 0 ? imagesToSend : undefined },
+      requestOptions: { prompt: message, options: null, images: attachedImages.length > 0 ? attachedImages : undefined },
     },
   )
   scrollToBottom()
@@ -362,6 +365,7 @@ async function onConversation() {
       message,
       options,
       images: imagesToSend,
+      attachedImages,
       signal: ctrl.signal,
       scrollOnUpdate: true,
     })
