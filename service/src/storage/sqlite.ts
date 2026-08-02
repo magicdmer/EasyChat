@@ -346,7 +346,7 @@ export async function createUser(email: string, password: string, roles?: UserRo
   userInfo.roles = roles
   userInfo.remark = remark
 
-  return new Promise<UserInfo>((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const sql = 'INSERT INTO user (name, email, password, status, createTime, updateTime, roles, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     db.run(sql, [
       userInfo.name,
@@ -361,10 +361,15 @@ export async function createUser(email: string, password: string, roles?: UserRo
       if (err) reject(err)
       else {
         userInfo.id = this.lastID
-        resolve(userInfo)
+        resolve()
       }
     })
   })
+
+  if (!userInfo.roles?.includes(UserRole.Admin))
+    await enablePublishedPluginsForUserByDefault(String(userInfo.id))
+
+  return userInfo
 }
 
 // 获取用户信息
@@ -1251,6 +1256,28 @@ export async function getUserPluginEnabled(userId: string, pluginId: string): Pr
     [userId, pluginId],
   )
   return Boolean(row?.enabled)
+}
+
+export async function enablePluginForAllMembersByDefault(pluginId: string): Promise<void> {
+  await promisifyRun(`INSERT INTO user_plugin_config (user_id, plugin_id, enabled)
+    SELECT CAST(u.id AS TEXT), ?, 1
+    FROM user u
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM json_each(COALESCE(u.roles, '[]')) role
+      WHERE CAST(role.value AS INTEGER) = ?
+    )
+    ON CONFLICT(user_id, plugin_id) DO NOTHING`,
+  [pluginId, UserRole.Admin])
+}
+
+export async function enablePublishedPluginsForUserByDefault(userId: string): Promise<void> {
+  await promisifyRun(`INSERT INTO user_plugin_config (user_id, plugin_id, enabled)
+    SELECT ?, id, 1
+    FROM plugin_config
+    WHERE published = 1
+    ON CONFLICT(user_id, plugin_id) DO NOTHING`,
+  [userId])
 }
 
 export async function getEnabledPluginIds(userId: string): Promise<string[]> {

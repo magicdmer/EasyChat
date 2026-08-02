@@ -121,7 +121,7 @@ async function toggleEnabled(row: PluginItem) {
 async function togglePublished(row: PluginItem) {
   try {
     await fetchPublishPlugin(row.id, !row.published)
-    message.success(row.published ? '已取消发布' : '插件已发布')
+    message.success(row.published ? '已取消发布' : '插件已发布并为普通用户默认启用')
     await loadPlugins()
   }
   catch (error: any) {

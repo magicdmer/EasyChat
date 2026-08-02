@@ -8,6 +8,7 @@ import type { UserInfo } from '../storage/model'
 import { UserRole } from '../storage/model'
 import {
   deletePluginStorageValue,
+  enablePluginForAllMembersByDefault,
   getEnabledPluginIds,
   getPluginConfig,
   getPluginStorageValue,
@@ -415,7 +416,10 @@ export async function setPluginEnabledForUser(user: UserInfo, pluginId: string, 
 export async function setPluginPublished(pluginId: string, published: boolean): Promise<void> {
   if (!loadedPlugins.has(pluginId))
     throw new Error('插件不存在或加载失败')
+
   await updatePluginPublished(pluginId, published)
+  if (published)
+    await enablePluginForAllMembersByDefault(pluginId)
 }
 
 export async function savePluginSettings(pluginId: string, incoming: unknown): Promise<void> {
