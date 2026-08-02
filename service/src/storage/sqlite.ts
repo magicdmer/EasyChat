@@ -727,31 +727,26 @@ export async function deleteAllChatRooms(userId: string) {
 
 // 删除聊天记录
 export async function deleteChat(roomId: number, uuid: number, inversion: boolean) {
-  return new Promise((resolve, reject) => {
-    const sql = 'SELECT * FROM chat WHERE roomId = ? AND uuid = ?'
-    db.get<ChatDBRow>(sql, [roomId, uuid], (err, chat) => {
+  const deletedStatus = inversion ? Status.InversionDeleted : Status.ResponseDeleted
+  const complementaryStatus = inversion ? Status.ResponseDeleted : Status.InversionDeleted
+  return new Promise<void>((resolve, reject) => {
+    const sql = `UPDATE chat
+      SET status = CASE
+        WHEN status = ? THEN ?
+        WHEN status = ? THEN ?
+        ELSE status
+      END
+      WHERE roomId = ? AND uuid = ?`
+    db.run(sql, [
+      Status.Normal,
+      deletedStatus,
+      complementaryStatus,
+      Status.Deleted,
+      roomId,
+      uuid,
+    ], (err) => {
       if (err) reject(err)
-      else {
-        let newStatus
-        if (chat.status === Status.InversionDeleted && !inversion) { /* empty */ }
-        else if (chat.status === Status.ResponseDeleted && inversion) { /* empty */ }
-        else if (inversion) {
-          newStatus = Status.InversionDeleted
-        }
-        else {
-          newStatus = Status.ResponseDeleted
-        }
-        
-        if (newStatus) {
-          db.run('UPDATE chat SET status = ? WHERE roomId = ? AND uuid = ?', [newStatus, roomId, uuid], (err) => {
-            if (err) reject(err)
-            else resolve(null)
-          })
-        }
-        else {
-          resolve(null)
-        }
-      }
+      else resolve()
     })
   })
 }

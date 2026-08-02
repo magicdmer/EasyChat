@@ -278,22 +278,24 @@ export const useChatStore = defineStore('chat-store', {
       }
     },
 
-    deleteChatByUuid(uuid: number, index: number) {
-      if (!uuid || uuid === 0) {
-        if (this.chat.length) {
-          fetchDeleteChat(uuid, this.chat[0].data[index].uuid || 0, this.chat[0].data[index].inversion)
-          this.chat[0].data.splice(index, 1)
-          this.recordState()
-        }
+    async deleteChatByUuid(uuid: number, index: number) {
+      const chatIndex = (!uuid || uuid === 0)
+        ? 0
+        : this.chat.findIndex(item => item.uuid === uuid)
+      if (chatIndex < 0 || chatIndex >= this.chat.length)
         return
-      }
 
-      const chatIndex = this.chat.findIndex(item => item.uuid === uuid)
-      if (chatIndex !== -1) {
-        fetchDeleteChat(uuid, this.chat[chatIndex].data[index].uuid || 0, this.chat[chatIndex].data[index].inversion)
-        this.chat[chatIndex].data.splice(index, 1)
-        this.recordState()
-      }
+      const target = this.chat[chatIndex].data[index]
+      if (!target)
+        return
+
+      await fetchDeleteChat(uuid, target.uuid || 0, target.inversion)
+      const targetIndex = this.chat[chatIndex].data.findIndex(item => item.uuid === target.uuid && item.inversion === target.inversion)
+      if (targetIndex < 0)
+        return
+
+      this.chat[chatIndex].data.splice(targetIndex, 1)
+      this.recordState()
     },
 
     clearChatByUuid(uuid: number) {

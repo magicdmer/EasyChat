@@ -584,8 +584,14 @@ function handleDelete(index: number) {
     content: t('chat.deleteMessageConfirm'),
     positiveText: t('common.yes'),
     negativeText: t('common.no'),
-    onPositiveClick: () => {
-      chatStore.deleteChatByUuid(+uuid, index)
+    onPositiveClick: async () => {
+      try {
+        await chatStore.deleteChatByUuid(+uuid, index)
+      }
+      catch (error: any) {
+        ms.error(error?.message || t('common.wrong'))
+        return false
+      }
     },
   })
 }
