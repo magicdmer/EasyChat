@@ -1,9 +1,10 @@
 <script lang="ts" setup>
-import { computed, onMounted, onUnmounted, onUpdated, ref } from 'vue'
+import { computed, ref } from 'vue'
 import MarkdownIt from 'markdown-it'
 import mdKatex from '@traptitech/markdown-it-katex'
 import mila from 'markdown-it-link-attributes'
 import hljs from 'highlight.js'
+import ImagePreview from './ImagePreview.vue'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { t } from '@/locales'
 import { copyToClip } from '@/utils/copy'
@@ -21,6 +22,9 @@ const props = defineProps<Props>()
 const { isMobile } = useBasicLayout()
 
 const textRef = ref<HTMLElement>()
+const previewVisible = ref(false)
+const previewSrc = ref('')
+const previewAlt = ref('')
 
 const mdi = new MarkdownIt({
   html: false,
@@ -38,9 +42,20 @@ const mdi = new MarkdownIt({
 mdi.use(mila, { attrs: { target: '_blank', rel: 'noopener' } })
 mdi.use(mdKatex, { blockClass: 'katexmath-block rounded-md p-[10px]', errorColor: ' #cc0000' })
 
+const defaultImageRenderer = mdi.renderer.rules.image
+mdi.renderer.rules.image = (tokens, index, options, env, self) => {
+  const token = tokens[index]
+  token.attrSet('class', 'markdown-preview-image')
+  token.attrSet('loading', 'lazy')
+  token.attrSet('role', 'button')
+  token.attrSet('tabindex', '0')
+  token.attrSet('aria-label', t('chat.openImagePreview'))
+  return defaultImageRenderer?.(tokens, index, options, env, self) ?? self.renderToken(tokens, index, options)
+}
+
 const text = computed(() => {
   let value = props.text ?? ''
-  
+
   // 简单的解决方法：将 markdown 中的 http:// 图片链接替换为使用 wsrv.nl 代理（将 http 升级为 https）
   // 匹配 markdown 图片语法: ![alt](http://...)
   value = value.replace(/!\[([^\]]*)\]\((http:\/\/[^\)]+)\)/g, (match, alt, url) => {
@@ -49,10 +64,9 @@ const text = computed(() => {
     return `![${alt}](${proxyUrl})`
   })
 
-  if (!props.asRawText) {
+  if (!props.asRawText)
     return mdi.render(value)
-  }
-  
+
   return value
 })
 
@@ -71,52 +85,58 @@ function highlightBlock(str: string, lang?: string) {
   return `<pre class="code-block-wrapper"><div class="code-block-header"><span class="code-block-header__lang">${lang}</span><span class="code-block-header__copy">${t('chat.copyCode')}</span></div><code class="hljs code-block-body ${lang}">${str}</code></pre>`
 }
 
-function addCopyEvents() {
-  if (textRef.value) {
-    const copyBtn = textRef.value.querySelectorAll('.code-block-header__copy')
-    copyBtn.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const code = btn.parentElement?.nextElementSibling?.textContent
-        if (code) {
-          copyToClip(code).then(() => {
-            btn.textContent = '复制成功'
-            setTimeout(() => {
-              btn.textContent = '复制代码'
-            }, 1000)
-          })
-        }
-      })
+function openImagePreview(image: HTMLImageElement) {
+  previewSrc.value = image.currentSrc || image.src
+  previewAlt.value = image.alt
+  previewVisible.value = true
+}
+
+function handleContentClick(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  const image = target.closest<HTMLImageElement>('.markdown-body img')
+  if (image) {
+    event.preventDefault()
+    openImagePreview(image)
+    return
+  }
+
+  const copyButton = target.closest<HTMLElement>('.code-block-header__copy')
+  if (!copyButton)
+    return
+
+  const code = copyButton.parentElement?.nextElementSibling?.textContent
+  if (code) {
+    copyToClip(code).then(() => {
+      copyButton.textContent = t('chat.copied')
+      setTimeout(() => {
+        copyButton.textContent = t('chat.copyCode')
+      }, 1000)
     })
   }
 }
-function removeCopyEvents() {
-  if (textRef.value) {
-    const copyBtn = textRef.value.querySelectorAll('.code-block-header__copy')
-    copyBtn.forEach((btn) => {
-      btn.removeEventListener('click', () => { })
-    })
-  }
+
+function handleContentKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Enter' && event.key !== ' ')
+    return
+
+  const target = event.target as HTMLElement
+  if (!(target instanceof HTMLImageElement) || !target.matches('.markdown-body img'))
+    return
+
+  event.preventDefault()
+  openImagePreview(target)
 }
-onMounted(() => {
-  addCopyEvents()
-})
-onUpdated(() => {
-  addCopyEvents()
-})
-onUnmounted(() => {
-  removeCopyEvents()
-})
 </script>
 
 <template>
   <div :class="wrapClass">
-    <div ref="textRef" class="leading-relaxed break-words">
+    <div ref="textRef" class="leading-relaxed break-words" @click="handleContentClick" @keydown="handleContentKeydown">
       <div v-if="!inversion" class="flex items-end">
         <template v-if="loading && !text">
           <div class="typing-indicator">
-            <span class="typing-dot"></span>
-            <span class="typing-dot"></span>
-            <span class="typing-dot"></span>
+            <span class="typing-dot" />
+            <span class="typing-dot" />
+            <span class="typing-dot" />
           </div>
         </template>
         <template v-else>
@@ -129,6 +149,13 @@ onUnmounted(() => {
         <div v-else class="w-full whitespace-pre-wrap" v-text="text" />
       </div>
     </div>
+    <ImagePreview
+      v-if="previewVisible"
+      :visible="previewVisible"
+      :src="previewSrc"
+      :alt="previewAlt"
+      @close="previewVisible = false"
+    />
   </div>
 </template>
 

@@ -94,6 +94,21 @@
 		display: inline-block;
 	}
 
+	.markdown-preview-image {
+		cursor: zoom-in;
+		transition: opacity 150ms ease, box-shadow 150ms ease;
+
+		&:hover {
+			opacity: 0.92;
+			box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.22);
+		}
+
+		&:focus-visible {
+			outline: 3px solid rgba(99, 102, 241, 0.7);
+			outline-offset: 3px;
+		}
+	}
+
 	table {
 		width: 100%;
 		max-width: 100%;

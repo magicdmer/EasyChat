@@ -10,6 +10,12 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
     vue(),
     env.VITE_GLOB_APP_PWA === 'true' && VitePWA({
       injectRegister: 'auto',
+      registerType: 'autoUpdate',
+      workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+      },
       manifest: {
         name: '简聊',
         short_name: '简聊',
