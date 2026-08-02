@@ -1,13 +1,13 @@
 import { Database } from 'sqlite3'
 import * as dotenv from 'dotenv'
 import dayjs from 'dayjs'
-import { md5 } from '../utils/security'
 import { ChatInfo, ChatRoom, ChatUsage, Status, UserInfo, UserRole, Config, ChatOptions, KeyConfig, PluginConfig } from './model'
 import type { UsageResponse } from './model'
 import fs from 'fs'
 
 interface ChatDBRow {
   id: number
+  userId?: string
   roomId: number
   uuid: number
   dateTime: number
@@ -97,7 +97,9 @@ dotenv.config()
 if (!fs.existsSync('./data'))
   fs.mkdirSync('./data', { recursive: true })
 
-const db = new Database('./data/chatgpt.db')
+const DATABASE_PATH = './data/chatgpt.db'
+const db = new Database(DATABASE_PATH)
+db.configure('busyTimeout', 5000)
 
 // 初始化数据库表
 db.serialize(() => {
@@ -107,6 +109,7 @@ db.serialize(() => {
   // 创建聊天记录表
   db.run(`CREATE TABLE IF NOT EXISTS chat (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT,
     roomId INTEGER NOT NULL,
     uuid INTEGER NOT NULL,
     dateTime INTEGER NOT NULL,
@@ -130,6 +133,24 @@ db.serialize(() => {
     status INTEGER DEFAULT 0,
     chatModel TEXT DEFAULT 'gpt-3.5-turbo'
   )`)
+
+  // 为旧数据库补充聊天记录归属。只有 roomId 能唯一映射到一个用户时才回填，
+  // 遇到历史冲突则保留为空，避免把无法确认归属的数据暴露给错误用户。
+  db.run('ALTER TABLE chat ADD COLUMN userId TEXT', [], () => {})
+  db.run(`UPDATE chat
+    SET userId = (
+      SELECT MIN(cr.userId)
+      FROM chat_room cr
+      WHERE cr.roomId = chat.roomId
+    )
+    WHERE userId IS NULL
+      AND 1 = (
+        SELECT COUNT(DISTINCT cr.userId)
+        FROM chat_room cr
+        WHERE cr.roomId = chat.roomId
+      )`)
+  db.run('CREATE INDEX IF NOT EXISTS idx_chat_user_room_uuid ON chat(userId, roomId, uuid)')
+  db.run('CREATE INDEX IF NOT EXISTS idx_chat_room_user_room ON chat_room(userId, roomId)')
 
   // 旧数据库中已有标题不参与自动重命名
   db.run("ALTER TABLE chat_room ADD COLUMN titleSource TEXT DEFAULT 'legacy'", [], (err) => {
@@ -240,12 +261,12 @@ const promisifyRun = (sql: string, params: any[] = []): Promise<{ lastID: number
 }
 
 // 插入聊天信息
-export async function insertChat(uuid: number, text: string, roomId: number, options?: ChatOptions, images?: string[]) {
+export async function insertChat(userId: string, uuid: number, text: string, roomId: number, options?: ChatOptions, images?: string[]) {
   const chatInfo = new ChatInfo(roomId, uuid, text, options)
   chatInfo.images = Array.isArray(images) ? images : []
   return new Promise<ChatInfo>((resolve, reject) => {
-    const sql = 'INSERT INTO chat (roomId, uuid, dateTime, prompt, images, options) VALUES (?, ?, ?, ?, ?, ?)'
-    db.run(sql, [roomId, uuid, chatInfo.dateTime, text, JSON.stringify(chatInfo.images || []), JSON.stringify(options || new ChatOptions())], function(err) {
+    const sql = 'INSERT INTO chat (userId, roomId, uuid, dateTime, prompt, images, options) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    db.run(sql, [userId, roomId, uuid, chatInfo.dateTime, text, JSON.stringify(chatInfo.images || []), JSON.stringify(options || new ChatOptions())], function(err) {
       if (err) reject(err)
       else {
         chatInfo.id = this.lastID
@@ -256,8 +277,8 @@ export async function insertChat(uuid: number, text: string, roomId: number, opt
 }
 
 // 获取聊天信息
-export async function getChatByMessageId(messageId: string): Promise<ChatInfo | undefined> {
-  const row = await promisifyGet<ChatDBRow>('SELECT * FROM chat WHERE json_extract(options, "$.messageId") = ?', [messageId])
+export async function getChatByMessageId(userId: string, messageId: string): Promise<ChatInfo | undefined> {
+  const row = await promisifyGet<ChatDBRow>('SELECT * FROM chat WHERE userId = ? AND json_extract(options, "$.messageId") = ?', [userId, messageId])
   if (!row) return undefined
   
   const chatInfo = new ChatInfo(
@@ -279,16 +300,15 @@ export async function getChatByMessageId(messageId: string): Promise<ChatInfo | 
 // 创建聊天室
 export async function createChatRoom(userId: string, title: string, roomId: number, chatModel: string) {
   const room = new ChatRoom(userId, title, roomId, chatModel)
-  return new Promise<ChatRoom>((resolve, reject) => {
-    const sql = 'INSERT INTO chat_room (userId, title, titleSource, roomId, chatModel) VALUES (?, ?, ?, ?, ?)'
-    db.run(sql, [userId, title, 'placeholder', roomId, chatModel], function(err) {
-      if (err) reject(err)
-      else {
-        room.id = this.lastID
-        resolve(room)
-      }
-    })
-  })
+  const result = await promisifyRun(`INSERT INTO chat_room (userId, title, titleSource, roomId, chatModel)
+    SELECT ?, ?, ?, ?, ?
+    WHERE NOT EXISTS (
+      SELECT 1 FROM chat_room WHERE userId = ? AND roomId = ?
+    )`, [userId, title, 'placeholder', roomId, chatModel, userId, roomId])
+  if (result.changes !== 1)
+    throw new Error('Chat room already exists')
+  room.id = result.lastID
+  return room
 }
 
 // 获取聊天室列表
@@ -309,10 +329,11 @@ export async function getChatRooms(userId: string): Promise<ChatRoom[]> {
 
 // 更新聊天室聊天模型
 export async function updateRoomChatModel(userId: string, roomId: number, chatModel: string): Promise<boolean> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const sql = 'UPDATE chat_room SET chatModel = ? WHERE userId = ? AND roomId = ?'
     db.run(sql, [chatModel, userId, roomId], function(err) {
-      resolve(!err)
+      if (err) reject(err)
+      else resolve(this.changes > 0)
     })
   })
 }
@@ -698,10 +719,10 @@ export async function getUserStatisticsByDay(userId: string | null, start: numbe
 }
 
 // 清除聊天记录
-export async function clearChat(roomId: number) {
+export async function clearChat(userId: string, roomId: number) {
   return new Promise((resolve, reject) => {
-    const sql = 'UPDATE chat SET status = ? WHERE roomId = ?'
-    db.run(sql, [Status.Deleted, roomId], (err) => {
+    const sql = 'UPDATE chat SET status = ? WHERE userId = ? AND roomId = ?'
+    db.run(sql, [Status.Deleted, userId, roomId], (err) => {
       if (err) reject(err)
       else resolve(null)
     })
@@ -710,23 +731,20 @@ export async function clearChat(roomId: number) {
 
 // 删除所有聊天室
 export async function deleteAllChatRooms(userId: string) {
-  return new Promise<void>((resolve, reject) => {
-    db.run('UPDATE chat_room SET status = ? WHERE userId = ? AND status = ?',
-      [Status.Deleted, userId, Status.Normal], (err) => {
-        if (err) reject(err)
-        else {
-          db.run('UPDATE chat SET status = ? WHERE roomId IN (SELECT roomId FROM chat_room WHERE userId = ?) AND status = ?',
-            [Status.Deleted, userId, Status.Normal], (err2) => {
-              if (err2) reject(err2)
-              else resolve()
-            })
-        }
-      })
-  })
+  return runTransaction([
+    {
+      sql: 'UPDATE chat_room SET status = ? WHERE userId = ? AND status = ?',
+      params: [Status.Deleted, userId, Status.Normal],
+    },
+    {
+      sql: 'UPDATE chat SET status = ? WHERE userId = ? AND status != ?',
+      params: [Status.Deleted, userId, Status.Deleted],
+    },
+  ])
 }
 
 // 删除聊天记录
-export async function deleteChat(roomId: number, uuid: number, inversion: boolean) {
+export async function deleteChat(userId: string, roomId: number, uuid: number, inversion: boolean) {
   const deletedStatus = inversion ? Status.InversionDeleted : Status.ResponseDeleted
   const complementaryStatus = inversion ? Status.ResponseDeleted : Status.InversionDeleted
   return new Promise<void>((resolve, reject) => {
@@ -736,12 +754,13 @@ export async function deleteChat(roomId: number, uuid: number, inversion: boolea
         WHEN status = ? THEN ?
         ELSE status
       END
-      WHERE roomId = ? AND uuid = ?`
+      WHERE userId = ? AND roomId = ? AND uuid = ?`
     db.run(sql, [
       Status.Normal,
       deletedStatus,
       complementaryStatus,
       Status.Deleted,
+      userId,
       roomId,
       uuid,
     ], (err) => {
@@ -753,20 +772,23 @@ export async function deleteChat(roomId: number, uuid: number, inversion: boolea
 
 // 删除聊天室
 export async function deleteChatRoom(userId: string, roomId: number) {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run('UPDATE chat_room SET status = ? WHERE roomId = ? AND userId = ?', [Status.Deleted, roomId, userId])
-      db.run('UPDATE chat SET status = ? WHERE roomId = ?', [Status.Deleted, roomId])
-      resolve(null)
-    })
-  })
+  return runTransaction([
+    {
+      sql: 'UPDATE chat_room SET status = ? WHERE roomId = ? AND userId = ?',
+      params: [Status.Deleted, roomId, userId],
+    },
+    {
+      sql: 'UPDATE chat SET status = ? WHERE roomId = ? AND userId = ?',
+      params: [Status.Deleted, roomId, userId],
+    },
+  ])
 }
 
 // 检查聊天室是否存在
 export async function existsChatRoom(userId: string, roomId: number): Promise<boolean> {
   return new Promise((resolve, reject) => {
-    const sql = 'SELECT 1 FROM chat_room WHERE userId = ? AND roomId = ?'
-    db.get(sql, [userId, roomId], (err, row) => {
+    const sql = 'SELECT 1 FROM chat_room WHERE userId = ? AND roomId = ? AND status != ?'
+    db.get(sql, [userId, roomId, Status.Deleted], (err, row) => {
       if (err) reject(err)
       else resolve(!!row)
     })
@@ -790,9 +812,9 @@ export async function getChatRoom(userId: string, roomId: number): Promise<ChatR
 }
 
 // 获取聊天记录列表
-export async function getChats(roomId: number, lastId?: number): Promise<ChatInfo[]> {
+export async function getChats(userId: string, roomId: number, lastId?: number): Promise<ChatInfo[]> {
   if (!lastId) lastId = new Date().getTime()
-  const rows = await promisifyAll<ChatDBRow>('SELECT * FROM chat WHERE roomId = ? AND uuid < ? AND status != ? ORDER BY dateTime DESC LIMIT 20', [roomId, lastId, Status.Deleted])
+  const rows = await promisifyAll<ChatDBRow>('SELECT * FROM chat WHERE userId = ? AND roomId = ? AND uuid < ? AND status != ? ORDER BY dateTime DESC LIMIT 20', [userId, roomId, lastId, Status.Deleted])
   
   const chats = rows.map(row => {
     const chatInfo = new ChatInfo(row.roomId, row.uuid, row.prompt, JSON.parse(row.options))
@@ -862,6 +884,7 @@ export async function getUsers(page: number, size: number): Promise<{ users: Use
     userInfo.roles = JSON.parse(row.roles)
     userInfo.remark = row.remark
     userInfo.config = JSON.parse(row.config || '{}')
+    userInfo.password = ''
     return userInfo
   })
 
@@ -925,16 +948,13 @@ export async function updateRoomUsingDraw(userId: string, roomId: number, using:
 }
 
 // 更新用户信息
-export async function updateUser(userId: string, roles: UserRole[], password: string, remark?: string) {
-  const row = await promisifyGet<UserDBRow>('SELECT password FROM user WHERE id = ?', [Number(userId)])
-  if (!row) return null
-
-  const sql = row.password !== password && row.password
+export async function updateUser(userId: string, roles: UserRole[], passwordHash?: string, remark?: string) {
+  const sql = passwordHash
     ? 'UPDATE user SET roles = ?, verifyTime = ?, password = ?, remark = ? WHERE id = ?'
     : 'UPDATE user SET roles = ?, verifyTime = ?, remark = ? WHERE id = ?'
   
-  const params = row.password !== password && row.password
-    ? [JSON.stringify(roles), new Date().toLocaleString(), md5(password), remark, Number(userId)]
+  const params = passwordHash
+    ? [JSON.stringify(roles), new Date().toLocaleString(), passwordHash, remark, Number(userId)]
     : [JSON.stringify(roles), new Date().toLocaleString(), remark, Number(userId)]
   
   return new Promise<void>((resolve, reject) => {
@@ -1007,8 +1027,8 @@ export async function verifyUser(email: string, status: Status) {
   })
 }
 
-export async function getChat(roomId: number, uuid: number): Promise<ChatInfo | null> {
-  const row = await promisifyGet<ChatDBRow>('SELECT * FROM chat WHERE roomId = ? AND uuid = ?', [roomId, uuid])
+export async function getChat(userId: string, roomId: number, uuid: number): Promise<ChatInfo | null> {
+  const row = await promisifyGet<ChatDBRow>('SELECT * FROM chat WHERE userId = ? AND roomId = ? AND uuid = ?', [userId, roomId, uuid])
   if (!row) return null
   
   const chatInfo = new ChatInfo(row.roomId, row.uuid, row.prompt, JSON.parse(row.options))
@@ -1021,7 +1041,7 @@ export async function getChat(roomId: number, uuid: number): Promise<ChatInfo | 
   return chatInfo
 }
 
-export async function updateChat(chatId: string, response: string, messageId: string, conversationId: string, usage: UsageResponse, previousResponse?: [], thinking?: string) {
+export async function updateChat(userId: string, chatId: string, response: string, messageId: string, conversationId: string, usage: UsageResponse, previousResponse?: [], thinking?: string) {
   const options = {
     messageId,
     conversationId,
@@ -1032,17 +1052,18 @@ export async function updateChat(chatId: string, response: string, messageId: st
     ...(thinking ? { thinking } : {})
   }
 
-  const queries = [{
-    sql: 'UPDATE chat SET response = ?, options = ?, previousResponse = ? WHERE id = ?',
-    params: [
+  const result = await promisifyRun(
+    'UPDATE chat SET response = ?, options = ?, previousResponse = ? WHERE id = ? AND userId = ?',
+    [
       response,
       JSON.stringify(options),
       previousResponse ? JSON.stringify(previousResponse) : null,
-      Number(chatId)
-    ]
-  }]
-
-  return runTransaction(queries)
+      Number(chatId),
+      userId,
+    ],
+  )
+  if (result.changes !== 1)
+    throw new Error('Chat does not exist or does not belong to the current user')
 }
 
 function initUserInfo(userInfo: UserInfo) {
@@ -1055,21 +1076,49 @@ function initUserInfo(userInfo: UserInfo) {
   }
 }
 
-const runTransaction = async (queries: Array<{sql: string, params: any[]}>) => {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run('BEGIN TRANSACTION')
-      
-      for (const {sql, params} of queries) {
-        db.run(sql, params)
+const runTransaction = async (queries: Array<{ sql: string; params: any[] }>) => {
+  return new Promise<void>((resolve, reject) => {
+    const transactionDb = new Database(DATABASE_PATH, (openError) => {
+      if (openError) {
+        reject(openError)
+        return
       }
-      
-      db.run('COMMIT', (err) => {
-        if (err) {
-          db.run('ROLLBACK')
-          reject(err)
+
+      transactionDb.configure('busyTimeout', 5000)
+      transactionDb.run('BEGIN IMMEDIATE TRANSACTION', (beginError) => {
+        if (beginError) {
+          transactionDb.close(() => reject(beginError))
+          return
         }
-        else resolve(null)
+
+        const rollback = (error: Error) => {
+          transactionDb.run('ROLLBACK', () => {
+            transactionDb.close(() => reject(error))
+          })
+        }
+
+        const execute = (index: number) => {
+          if (index >= queries.length) {
+            transactionDb.run('COMMIT', (commitError) => {
+              if (commitError)
+                rollback(commitError)
+              else
+                transactionDb.close(closeError => closeError ? reject(closeError) : resolve())
+            })
+            return
+          }
+
+          const { sql, params } = queries[index]
+          transactionDb.run(sql, params, (queryError) => {
+            if (queryError) {
+              rollback(queryError)
+              return
+            }
+            execute(index + 1)
+          })
+        }
+
+        execute(0)
       })
     })
   })

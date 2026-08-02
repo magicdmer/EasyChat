@@ -52,7 +52,7 @@ import {
 import { authLimiter, limiter } from './middleware/limiter'
 import { hasAnyRole, isEmail, isNotEmptyString } from './utils/is'
 import { sendNoticeMail, sendResetPasswordMail, sendTestMail, sendVerifyMail, sendVerifyMailAdmin } from './utils/mail'
-import { checkUserResetPassword, checkUserVerify, checkUserVerifyAdmin, getUserResetPasswordUrl, getUserVerifyUrl, getUserVerifyUrlAdmin, md5 } from './utils/security'
+import { checkUserResetPassword, checkUserVerify, checkUserVerifyAdmin, getUserResetPasswordUrl, getUserVerifyUrl, getUserVerifyUrlAdmin, hashPassword, needsPasswordRehash, verifyPassword } from './utils/security'
 import { rootAuth } from './middleware/rootAuth'
 import type { AuthJwtPayload } from './types'
 import {
@@ -470,7 +470,7 @@ router.get('/chat-history', auth, async (req, res) => {
       // res.send({ status: 'Fail', message: 'Unknow room', data: null })
       return
     }
-    const chats = await getChats(roomId, !isNotEmptyString(lastId) ? null : parseInt(lastId))
+    const chats = await getChats(userId, roomId, !isNotEmptyString(lastId) ? null : parseInt(lastId))
 
     const result = []
     chats.forEach((c) => {
@@ -543,7 +543,11 @@ router.get('/chat-response-history', auth, async (req, res) => {
       // res.send({ status: 'Fail', message: 'Unknow room', data: null })
       return
     }
-    const chat = await getChat(roomId, uuid)
+    const chat = await getChat(userId, roomId, uuid)
+    if (!chat) {
+      res.send({ status: 'Fail', message: 'Chat does not exist', data: [] })
+      return
+    }
     if (chat.previousResponse === undefined || chat.previousResponse.length < index) {
       res.send({ status: 'Fail', message: 'Error', data: [] })
       return
@@ -603,7 +607,7 @@ router.post('/chat-delete', auth, async (req, res) => {
       res.send({ status: 'Fail', message: 'Unknow room', data: null })
       return
     }
-    await deleteChat(roomId, uuid, inversion)
+    await deleteChat(userId, roomId, uuid, inversion)
     res.send({ status: 'Success', message: null, data: null })
   }
   catch (error) {
@@ -632,7 +636,7 @@ router.post('/chat-clear', auth, async (req, res) => {
       res.send({ status: 'Fail', message: 'Unknow room', data: null })
       return
     }
-    await clearChat(roomId)
+    await clearChat(userId, roomId)
     res.send({ status: 'Success', message: null, data: null })
   }
   catch (error) {
@@ -642,20 +646,28 @@ router.post('/chat-clear', auth, async (req, res) => {
 })
 
 router.post('/chat-process', [auth, limiter], async (req, res) => {
-  res.setHeader('Content-type', 'application/octet-stream')
-
   let { roomId, uuid, regenerate, prompt, images = [], attachedImages, options = {}, systemMessage, temperature, top_p, draw, autoContinue } = req.body as RequestProps
   const userId = req.headers.userId as string
-  const room = await getChatRoom(userId, roomId)
-  if (room == null)
-    global.console.error(`Unable to get chat room \t ${userId}\t ${roomId}`)
-  if (room != null && isNotEmptyString(room.prompt))
+  let room
+  try {
+    room = await getChatRoom(userId, roomId)
+  }
+  catch (error: any) {
+    res.send({ status: 'Fail', message: error?.message || 'Unable to load chat room', data: null })
+    return
+  }
+  if (room == null) {
+    res.send({ status: 'Fail', message: '会话不存在 | Chat room does not exist', data: null })
+    return
+  }
+
+  res.setHeader('Content-type', 'application/octet-stream')
+  if (isNotEmptyString(room.prompt))
     systemMessage = room.prompt
   let lastResponse
   let result
   let message: ChatInfo
   try {
-    const userId = req.headers.userId.toString()
     const user = await getUserById(userId)
 
     // images 包含模型实际输入（可能由历史自动回填）；attachedImages 只包含用户本次显式上传的附件。
@@ -667,8 +679,10 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
       userTextForInsert = attachmentsMarkdown ? `${prompt}\n\n${attachmentsMarkdown}` : prompt
     }
     message = regenerate
-      ? await getChat(roomId, uuid)
-      : await insertChat(uuid, userTextForInsert, roomId, options as ChatOptions, images)
+      ? await getChat(userId, roomId, uuid)
+      : await insertChat(userId, uuid, userTextForInsert, roomId, options as ChatOptions, images)
+    if (!message)
+      throw new Error('聊天记录不存在 | Chat does not exist')
     let firstChunk = true
     // 如有图片，将其转换为 visionContent 传入底层，复用统一流式输出逻辑
     let visionContent: any[] | undefined
@@ -775,7 +789,8 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
       if (regenerate && message.options.messageId) {
         const previousResponse = message.previousResponse || []
         previousResponse.push({ response: message.response, options: message.options })
-        await updateChat(message.id as unknown as string,
+        await updateChat(userId,
+          message.id as unknown as string,
           result.data.text,
           result.data.id,
           result.data.conversationId,
@@ -784,7 +799,8 @@ router.post('/chat-process', [auth, limiter], async (req, res) => {
           (result.data as any).thinking as string)
       }
       else {
-        await updateChat(message.id as unknown as string,
+        await updateChat(userId,
+          message.id as unknown as string,
           result.data.text,
           result.data.id,
           result.data.conversationId,
@@ -811,8 +827,11 @@ router.post('/chat-abort', [auth, limiter], async (req, res) => {
   try {
     const userId = req.headers.userId.toString()
     const { text, messageId, conversationId, chatUuid } = req.body as { text: string; messageId: string; conversationId: string; chatUuid: number }
-    const msgId = await abortChatProcess(chatUuid || userId)
-    await updateChat(msgId,
+    const msgId = abortChatProcess(userId, chatUuid)
+    if (!msgId)
+      throw new Error('No active chat process found')
+    await updateChat(userId,
+      msgId,
       text,
       messageId,
       conversationId,
@@ -862,7 +881,7 @@ router.post('/user-register', authLimiter, async (req, res) => {
       res.send({ status: 'Fail', message: '账号已存在 | The email exists', data: null })
       return
     }
-    const newPassword = md5(password)
+    const newPassword = await hashPassword(password)
     const isRoot = username.toLowerCase() === process.env.ROOT_USER
     await createUser(username, newPassword, isRoot ? [UserRole.Admin] : [UserRole.User])
 
@@ -942,7 +961,7 @@ router.post('/config', rootAuth, async (req, res) => {
         chatModels.push({ label: model, key: model, value: model })
       })
 
-      updateUserVisitTime(userInfo.userId, new Date().toLocaleString())
+      await updateUserVisitTime(userInfo.userId, new Date().toLocaleString())
     }
 
     res.send({
@@ -975,7 +994,7 @@ router.post('/user-login', authLimiter, async (req, res) => {
       throw new Error('用户名或密码为空 | Username or password is empty')
 
     const user = await getUser(username)
-    if (user == null || user.password !== md5(password))
+    if (user == null || !await verifyPassword(password, user.password))
       throw new Error('用户不存在或密码错误 | User does not exist or incorrect password.')
     if (user.status === Status.PreVerify)
       throw new Error('请去邮箱中验证 | Please verify in the mailbox')
@@ -983,6 +1002,9 @@ router.post('/user-login', authLimiter, async (req, res) => {
       throw new Error('请等待管理员开通 | Please wait for the admin to activate')
     if (user.status !== Status.Normal)
       throw new Error('账户状态异常 | Account status abnormal.')
+
+    if (needsPasswordRehash(user.password))
+      await updateUserPassword(user.id.toString(), await hashPassword(password))
 
     const config = await getCacheConfig()
     const token = jwt.sign({
@@ -1027,7 +1049,7 @@ router.post('/user-reset-password', authLimiter, async (req, res) => {
     if (user == null || user.status !== Status.Normal)
       throw new Error('账户状态异常 | Account status abnormal.')
 
-    updateUserPassword(user.id.toString(), md5(password))
+    await updateUserPassword(user.id.toString(), await hashPassword(password))
 
     res.send({ status: 'Success', message: '密码重置成功 | Password reset successful', data: null })
   }
@@ -1101,7 +1123,13 @@ router.post('/user-edit', rootAuth, async (req, res) => {
   try {
     const { userId, email, password, roles, remark } = req.body as { userId?: string; email: string; password: string; roles: UserRole[]; remark?: string }
     if (userId) {
-      await updateUser(userId, roles, password, remark)
+      const existingUser = await getUserById(userId)
+      if (!existingUser)
+        throw new Error('用户不存在 | User does not exist.')
+      const passwordHash = isNotEmptyString(password) && password !== existingUser.password
+        ? await hashPassword(password)
+        : undefined
+      await updateUser(userId, roles, passwordHash, remark)
     }
     else {
       const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
@@ -1109,7 +1137,7 @@ router.post('/user-edit', rootAuth, async (req, res) => {
         throw new Error('请输入格式正确的邮箱 | Please enter a valid email address.')
       if (!isNotEmptyString(password))
         throw new Error('密码不能为空 | Password cannot be empty.')
-      const newPassword = md5(password)
+      const newPassword = await hashPassword(password)
       const user = await createUser(normalizedEmail, newPassword, roles, remark)
       await updateUserStatus(user.id.toString(), Status.Normal)
     }

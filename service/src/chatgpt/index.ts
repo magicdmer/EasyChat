@@ -123,7 +123,7 @@ async function chatReplyProcess(options: RequestOptions) {
       const backlog: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = []
       let safety = 20
       while (pid && safety-- > 0) {
-        const m = await getMessageById(pid)
+        const m = await getMessageById(userId, pid)
         if (!m) break
         if (m.role === 'user' || m.role === 'assistant')
           backlog.unshift({ role: m.role, content: m.text })
@@ -410,8 +410,8 @@ async function chatReplyProcess(options: RequestOptions) {
   }
 }
 
-export function abortChatProcess(chatUuid: number) {
-  const index = processThreads.findIndex(d => d.chatUuid === chatUuid)
+export function abortChatProcess(userId: string, chatUuid: number) {
+  const index = processThreads.findIndex(d => d.userId === userId && d.chatUuid === chatUuid)
   if (index <= -1)
     return
   const messageId = processThreads[index].messageId
@@ -438,23 +438,23 @@ async function setupProxyFetch(): Promise<typeof fetch | undefined> {
       password: isNotEmptyString(config.socksAuth) ? config.socksAuth.split(':')[1] : undefined,
 
     })
-    return (url, options) => fetch(url, { agent, ...options })
+    return (url, options) => fetch(url, { ...options, agent: agent as any })
   }
   else {
     if (isNotEmptyString(config.httpsProxy)) {
       const httpsProxy = config.httpsProxy
       if (httpsProxy) {
         const agent = new HttpsProxyAgent(httpsProxy)
-        return (url, options) => fetch(url, { agent, ...options })
+        return (url, options) => fetch(url, { ...options, agent: agent as any })
       }
     }
   }
   return undefined
 }
 
-async function getMessageById(id: string): Promise<ChatMessage> {
+async function getMessageById(userId: string, id: string): Promise<ChatMessage> {
   const isPrompt = id.startsWith('prompt_')
-  const chatInfo = await getChatByMessageId(isPrompt ? id.substring(7) : id)
+  const chatInfo = await getChatByMessageId(userId, isPrompt ? id.substring(7) : id)
 
   if (chatInfo) {
     const parentMessageId = isPrompt
@@ -463,7 +463,7 @@ async function getMessageById(id: string): Promise<ChatMessage> {
 
     if (chatInfo.status !== Status.Normal) { // jumps over deleted messages
       return parentMessageId
-        ? getMessageById(parentMessageId)
+        ? getMessageById(userId, parentMessageId)
         : undefined
     }
     else {

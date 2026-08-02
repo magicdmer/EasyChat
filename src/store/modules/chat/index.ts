@@ -103,9 +103,13 @@ export const useChatStore = defineStore('chat-store', {
       }
     },
 
-    async  setUsingContext(context: boolean, roomId: number) {
+    async setUsingContext(context: boolean, roomId: number) {
       await fetchUpdateChatRoomUsingContext(context, roomId)
-      this.recordState()
+      const index = this.history.findIndex(item => item.uuid === roomId)
+      if (index !== -1) {
+        this.history[index].usingContext = context
+        this.recordState()
+      }
     },
 
     async setUsingDraw(using: boolean, roomId: number) {
@@ -119,7 +123,11 @@ export const useChatStore = defineStore('chat-store', {
 
     async setChatModel(model: string, roomId: number) {
       await fetchUpdateChatRoomChatModel(model, roomId)
-      this.recordState()
+      const index = this.history.findIndex(item => item.uuid === roomId)
+      if (index !== -1) {
+        this.history[index].chatModel = model
+        this.recordState()
+      }
     },
 
     async addHistory(history: Chat.History, chatData: Chat.Chat[] = []) {
@@ -167,7 +175,7 @@ export const useChatStore = defineStore('chat-store', {
     async deleteHistory(index: number) {
       const targetUuid = this.history[index].uuid
       await fetchDeleteChatRoom(targetUuid)
-      
+
       const currentIndex = this.history.findIndex(item => item.uuid === targetUuid)
       if (currentIndex !== -1) {
         this.history.splice(currentIndex, 1)
@@ -298,19 +306,16 @@ export const useChatStore = defineStore('chat-store', {
       this.recordState()
     },
 
-    clearChatByUuid(uuid: number) {
-      if (!uuid || uuid === 0) {
-        if (this.chat.length) {
-          fetchClearChat(this.chat[0].uuid)
-          this.chat[0].data = []
-          this.recordState()
-        }
+    async clearChatByUuid(uuid: number) {
+      const targetUuid = (!uuid || uuid === 0)
+        ? this.chat[0]?.uuid
+        : uuid
+      if (!targetUuid)
         return
-      }
 
-      const index = this.chat.findIndex(item => item.uuid === uuid)
+      await fetchClearChat(targetUuid)
+      const index = this.chat.findIndex(item => item.uuid === targetUuid)
       if (index !== -1) {
-        fetchClearChat(uuid)
         this.chat[index].data = []
         this.recordState()
       }

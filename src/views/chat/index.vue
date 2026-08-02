@@ -605,8 +605,14 @@ function handleClear() {
     content: t('chat.clearChatConfirm'),
     positiveText: t('common.yes'),
     negativeText: t('common.no'),
-    onPositiveClick: () => {
-      chatStore.clearChatByUuid(+uuid)
+    onPositiveClick: async () => {
+      try {
+        await chatStore.clearChatByUuid(+uuid)
+      }
+      catch (error: any) {
+        ms.error(error?.message || t('common.wrong'))
+        return false
+      }
     },
   })
 }
@@ -694,12 +700,17 @@ async function handleToggleUsingContext() {
     return
   }
 
-  currentChatHistory.value.usingContext = !currentChatHistory.value.usingContext
-  chatStore.setUsingContext(currentChatHistory.value.usingContext, +uuid)
-  if (currentChatHistory.value.usingContext)
-    ms.success(t('chat.turnOnContext'))
-  else
-    ms.warning(t('chat.turnOffContext'))
+  const newValue = !currentChatHistory.value.usingContext
+  try {
+    await chatStore.setUsingContext(newValue, +uuid)
+    if (newValue)
+      ms.success(t('chat.turnOnContext'))
+    else
+      ms.warning(t('chat.turnOffContext'))
+  }
+  catch (error: any) {
+    ms.error(error?.message || t('common.wrong'))
+  }
 }
 
 async function handleToggleUsingDraw() {
@@ -707,21 +718,31 @@ async function handleToggleUsingDraw() {
     return
 
   const newValue = !currentChatHistory.value.usingDraw
-  currentChatHistory.value.usingDraw = newValue
-  await chatStore.setUsingDraw(newValue, +uuid)
-
-  if (newValue) {
-    if (currentChatHistory.value.usingContext) {
-      currentChatHistory.value.usingContext = false
+  const contextWasEnabled = currentChatHistory.value.usingContext
+  try {
+    if (newValue && contextWasEnabled)
       await chatStore.setUsingContext(false, +uuid)
-      ms.warning(t('chat.turnOffContextBecauseDraw'))
+
+    await chatStore.setUsingDraw(newValue, +uuid)
+
+    if (newValue) {
+      if (contextWasEnabled)
+        ms.warning(t('chat.turnOffContextBecauseDraw'))
+      else
+        ms.success(t('chat.turnOnDraw'))
     }
     else {
-      ms.success(t('chat.turnOnDraw'))
+      ms.warning(t('chat.turnOffDraw'))
     }
   }
-  else {
-    ms.warning(t('chat.turnOffDraw'))
+  catch (error: any) {
+    if (newValue && contextWasEnabled && !currentChatHistory.value.usingContext) {
+      try {
+        await chatStore.setUsingContext(true, +uuid)
+      }
+      catch {}
+    }
+    ms.error(error?.message || t('common.wrong'))
   }
 }
 
@@ -799,8 +820,12 @@ async function handleSyncChatModel(chatModel: string) {
   if (!currentChatHistory.value)
     return
 
-  currentChatHistory.value.chatModel = chatModel
-  chatStore.setChatModel(currentChatHistory.value.chatModel, +uuid)
+  try {
+    await chatStore.setChatModel(chatModel, +uuid)
+  }
+  catch (error: any) {
+    ms.error(error?.message || t('common.wrong'))
+  }
 }
 
 const autoDisablingDrawRooms = new Set<number>()

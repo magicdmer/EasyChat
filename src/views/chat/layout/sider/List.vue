@@ -62,11 +62,16 @@ async function handleEdit({ uuid }: Chat.History, isEdit: boolean, event?: Mouse
   }
 }
 
-function handleDelete(index: number, event?: MouseEvent | TouchEvent) {
+async function handleDelete(index: number, event?: MouseEvent | TouchEvent) {
   event?.stopPropagation()
-  chatStore.deleteHistory(index)
-  if (isMobile.value)
-    appStore.setSiderCollapsed(true)
+  try {
+    await chatStore.deleteHistory(index)
+    if (isMobile.value)
+      appStore.setSiderCollapsed(true)
+  }
+  catch (error: any) {
+    ms.error(error?.message || '删除会话失败')
+  }
 }
 
 const handleDeleteDebounce = debounce(handleDelete, 600)
