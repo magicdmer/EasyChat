@@ -45,7 +45,15 @@ mdi.use(mdKatex, { blockClass: 'katexmath-block rounded-md p-[10px]', errorColor
 const defaultImageRenderer = mdi.renderer.rules.image
 mdi.renderer.rules.image = (tokens, index, options, env, self) => {
   const token = tokens[index]
+  const hasContentBefore = tokens.slice(0, index).some((currentToken) => {
+    if (currentToken.type === 'text')
+      return currentToken.content.trim().length > 0
+
+    return !['softbreak', 'hardbreak', 'link_open', 'link_close', 'image'].includes(currentToken.type)
+  })
   token.attrSet('class', 'markdown-preview-image')
+  if (hasContentBefore)
+    token.attrJoin('class', 'markdown-preview-image-after-content')
   token.attrSet('loading', 'lazy')
   token.attrSet('role', 'button')
   token.attrSet('tabindex', '0')
@@ -63,6 +71,10 @@ const text = computed(() => {
     const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(url)}`
     return `![${alt}](${proxyUrl})`
   })
+
+  // AI 返回的文字与 Markdown 图片紧邻时补一个换行，已有换行保持不变
+  if (!props.inversion)
+    value = value.replace(/([^\r\n])(!\[[^\]]*\]\([^)]+\))/g, '$1\n$2')
 
   if (!props.asRawText)
     return mdi.render(value)

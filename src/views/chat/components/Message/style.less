@@ -91,12 +91,16 @@
 		height: auto;
 		max-height: 300px;
 		border-radius: 10px;
-		display: inline-block;
+		display: block;
 	}
 
 	.markdown-preview-image {
 		cursor: zoom-in;
 		transition: opacity 150ms ease, box-shadow 150ms ease;
+
+		&.markdown-preview-image-after-content {
+			margin-top: 12px;
+		}
 
 		&:hover {
 			opacity: 0.92;
